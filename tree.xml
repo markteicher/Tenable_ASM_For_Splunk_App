@@ -1,4 +1,4 @@
-tenable_asm/
+tenable_attack_surface_management/
 ├── appserver/
 │   └── static/
 │       ├── appIcon.png
@@ -7,101 +7,40 @@ tenable_asm/
 │       └── appIconAlt_2x.png
 │
 ├── bin/
-│   ├── tenable_asm_ingest.py
-│   ├── tenable_asm_assets.py
-│   ├── tenable_asm_asset_details.py
-│   ├── tenable_asm_inventories.py
-│   ├── tenable_asm_sources.py
-│   ├── tenable_asm_tags.py
-│   ├── tenable_asm_saved_queries.py
-│   ├── tenable_asm_notifications.py
-│   ├── tenable_asm_exports.py
-│   ├── tenable_asm_drift.py
-│   ├── tenable_asm_services.py
-│   ├── tenable_asm_ssl.py
-│   ├── tenable_asm_screenshots.py
-│   ├── tenable_asm_wtech.py
-│   ├── tenable_asm_domaininfo.py
-│   ├── tenable_asm_ipgeo.py
-│   ├── tenable_asm_ports.py
-│   ├── tenable_asm_rbls.py
-│   ├── tenable_asm_app_updates.py
-│   ├── tenable_asm_health.py
-│   ├── tenable_asm_backfill.py
-│   ├── tenable_asm_checkpoint.py
-│   └── utils/
-│       ├── api.py
-│       ├── auth.py
-│       ├── config.py
-│       ├── http.py
-│       ├── logging.py
-│       ├── paging.py
-│       ├── time.py
-│       ├── state.py
-│       └── jsonl.py
+│   ├── tenable_attack_surface_management_ingest.py
+│   └── lib/
+│       ├── __init__.py
+│       ├── asm_http.py
+│       ├── asm_auth.py
+│       ├── asm_paging.py
+│       ├── asm_state.py
+│       ├── asm_logging.py
+│       └── asm_time.py
 │
 ├── default/
 │   ├── app.conf
 │   ├── authorize.conf
-│   ├── commands.conf
-│   ├── datamodels.conf
-│   ├── eventtypes.conf
-│   ├── indexes.conf
 │   ├── inputs.conf
-│   ├── macros.conf
 │   ├── props.conf
 │   ├── savedsearches.conf
-│   ├── tags.conf
-│   ├── transforms.conf
+│   ├── transforms.conf          # placeholder only (empty until designed)
 │   ├── web.conf
-│   ├── workflow_actions.conf
-│   └── setup.xml
+│   ├── setup.xml
 │   └── data/
-│       ├── ui/
-│       │   ├── nav/
-│       │   │   └── default.xml
-│       │   └── views/
-│       │       ├── overview.xml
-│       │       ├── inventories.xml
-│       │       ├── assets.xml
-│       │       ├── asset_details.xml
-│       │       ├── attribution.xml
-│       │       ├── tags.xml
-│       │       ├── saved_queries.xml
-│       │       ├── notifications.xml
-│       │       ├── discovery_sources.xml
-│       │       ├── discovery_changes.xml
-│       │       ├── severity_ranking.xml
-│       │       ├── severity_trend.xml
-│       │       ├── geography.xml
-│       │       ├── services_web_servers.xml
-│       │       ├── services_ports.xml
-│       │       ├── ssl_overview.xml
-│       │       ├── ssl_expiration.xml
-│       │       ├── ssl_errors.xml
-│       │       ├── screenshots.xml
-│       │       ├── technology.xml
-│       │       ├── reputation.xml
-│       │       ├── operations.xml
-│       │       └── administration.xml
-│       └── (optional future: appserver/ui modules if needed)
-│
-├── local/
-│   └── README.txt
-│
-├── lookups/
-│   ├── asm_asset_type.csv
-│   ├── asm_record_type.csv
-│   ├── asm_severity_ranking.csv
-│   ├── asm_cloud_provider.csv
-│   ├── asm_country_codes.csv
-│   ├── asm_service_normalization.csv
-│   ├── asm_web_servers.csv
-│   ├── asm_ssl_protocols.csv
-│   ├── asm_ssl_errors.csv
-│   ├── asm_rbls.csv
-│   ├── asm_wtech_categories.csv
-│   └── asm_source_types.csv
+│       └── ui/
+│           ├── nav/
+│           │   └── default.xml
+│           └── views/
+│               ├── overview.xml
+│               ├── assets.xml
+│               ├── asset_details.xml
+│               ├── sources.xml
+│               ├── tags.xml
+│               ├── saved_queries.xml
+│               ├── notifications.xml
+│               ├── dashboard_widgets.xml
+│               ├── operations.xml
+│               └── administration.xml
 │
 ├── metadata/
 │   └── default.meta
@@ -109,6 +48,4 @@ tenable_asm/
 └── README/
     ├── README.md
     ├── INSTALL.md
-    ├── UPGRADE.md
-    ├── CHANGELOG.md
-    └── TROUBLESHOOTING.md
+    └── UPGRADE.md
