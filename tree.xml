@@ -7,45 +7,74 @@ tenable_attack_surface_management/
 │       └── appIconAlt_2x.png
 │
 ├── bin/
-│   ├── tenable_attack_surface_management_ingest.py
-│   └── lib/
-│       ├── __init__.py
-│       ├── asm_http.py
+│   ├── tenable_asm_ingest.py
+│   ├── tenable_asm_assets.py
+│   ├── tenable_asm_asset_history.py
+│   ├── tenable_asm_asset_bulk.py
+│   ├── tenable_asm_severity.py
+│   ├── tenable_asm_sources.py
+│   ├── tenable_asm_tags.py
+│   ├── tenable_asm_subscriptions.py
+│   ├── tenable_asm_alerts.py
+│   ├── tenable_asm_dashboard_api.py
+│   ├── tenable_asm_text_records.py
+│   ├── tenable_asm_user_action_logs.py
+│   ├── tenable_asm_cloudflare_keys.py
+│   ├── tenable_asm_aws_keys.py
+│   ├── tenable_asm_azure_keys.py
+│   └── utils/
+│       ├── asm_api.py
 │       ├── asm_auth.py
-│       ├── asm_paging.py
-│       ├── asm_state.py
+│       ├── asm_pagination.py
+│       ├── asm_rate_limit.py
 │       ├── asm_logging.py
 │       └── asm_time.py
 │
 ├── default/
 │   ├── app.conf
-│   ├── authorize.conf
 │   ├── inputs.conf
 │   ├── props.conf
 │   ├── savedsearches.conf
-│   ├── transforms.conf          # placeholder only (empty until designed)
-│   ├── web.conf
+│   ├── commands.conf
 │   ├── setup.xml
-│   └── data/
-│       └── ui/
-│           ├── nav/
-│           │   └── default.xml
-│           └── views/
-│               ├── overview.xml
-│               ├── assets.xml
-│               ├── asset_details.xml
-│               ├── sources.xml
-│               ├── tags.xml
-│               ├── saved_queries.xml
-│               ├── notifications.xml
-│               ├── dashboard_widgets.xml
-│               ├── operations.xml
-│               └── administration.xml
+│   └── web.conf
+│
+├── local/
+│   └── (runtime configuration only)
 │
 ├── metadata/
 │   └── default.meta
 │
-└── README/
-    ├── README.md
-    ├── INSTALL.md
-    └── UPGRADE.md
+├── nav/
+│   └── default.xml
+│
+├── ui/
+│   └── views/
+│       ├── asm_overview.xml
+│       ├── asm_inventory.xml
+│       ├── asm_assets.xml
+│       ├── asm_asset_details.xml
+│       ├── asm_asset_history.xml
+│       ├── asm_severity_breakdown.xml
+│       ├── asm_attack_surface_trends.xml
+│       ├── asm_sources.xml
+│       ├── asm_tags.xml
+│       ├── asm_subscriptions.xml
+│       ├── asm_subscription_history.xml
+│       ├── asm_alerts.xml
+│       ├── asm_reporting.xml
+│       ├── asm_text_records.xml
+│       ├── asm_user_activity.xml
+│       ├── asm_cloud_integrations.xml
+│       ├── asm_cloudflare_keys.xml
+│       ├── asm_aws_keys.xml
+│       ├── asm_azure_keys.xml
+│       ├── asm_operations.xml
+│       └── asm_administration.xml
+│
+├── README/
+│   ├── README.md
+│   ├── INSTALL.md
+│   └── UPGRADE.md
+│
+└── LICENSE
