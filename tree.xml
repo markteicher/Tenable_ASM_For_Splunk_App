@@ -1,0 +1,68 @@
+tenable_asm/
+├── appserver/
+│   └── static/
+│       ├── appicon.png          # 36x36 – launcher icon
+│       ├── applogo.png          # 160x40 – header logo
+│       ├── background.png       # optional UI background
+│       └── tenable.png          # vendor branding (if used)
+│
+├── bin/
+│   ├── tenable_asm_ingest.py    # main ingestion driver (future)
+│   ├── tenable_asm_assets.py
+│   ├── tenable_asm_sources.py
+│   ├── tenable_asm_tags.py
+│   ├── tenable_asm_activity.py
+│   └── utils/
+│       ├── api.py
+│       ├── auth.py
+│       ├── logging.py
+│       └── time.py
+│
+├── default/
+│   ├── app.conf
+│   ├── datamodels.conf
+│   ├── eventtypes.conf
+│   ├── inputs.conf
+│   ├── props.conf
+│   ├── savedsearches.conf
+│   ├── tags.conf
+│   ├── transforms.conf
+│   ├── web.conf
+│   └── setup.xml
+│
+├── local/
+│   └── README.txt               # runtime overrides only
+│
+├── lookups/
+│   ├── asm_asset_type.csv
+│   ├── asm_severity_ranking.csv
+│   ├── asm_record_type.csv
+│   ├── asm_cloud_provider.csv
+│   └── asm_country_codes.csv
+│
+├── metadata/
+│   └── default.meta
+│
+├── nav/
+│   └── nav.xml
+│
+├── README/
+│   ├── README.md
+│   ├── INSTALL.md
+│   └── UPGRADE.md
+│
+└── ui/
+    └── views/
+        ├── overview.xml                 # ASM executive overview
+        ├── assets.xml                   # asset inventory
+        ├── asset_details.xml            # drilldown view
+        ├── severity.xml                 # severity ranking views
+        ├── geography.xml                # country / region
+        ├── services.xml                 # web servers, ports
+        ├── discovery_sources.xml        # domains, IPs, ASN, cloud
+        ├── discovery_changes.xml        # new / disappeared assets
+        ├── tags.xml                     # tagging & attribution
+        ├── saved_views.xml              # saved queries
+        ├── notifications.xml            # change monitoring
+        ├── operations.xml               # ingestion health, freshness
+        └── administration.xml           # access & retention
