@@ -1,2 +1,2 @@
-# Tenable_ASM_For_Splunk_App
+# Tenable ASM For Splunk App
 Tenable Attack Surface Management For Splunk App
