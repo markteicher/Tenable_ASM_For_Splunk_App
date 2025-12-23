@@ -7,20 +7,28 @@ tenable_attack_surface_management/
 │       └── appIconAlt_2x.png
 │
 ├── bin/
-│   ├── tenable_asm_modinput.py
+│   ├── tenable_asm_modinput.py        # Orchestrator (Splunk modular input)
+│   │
 │   └── lib/
 │       ├── __init__.py
-│       ├── asm_client.py
-│       ├── asm_auth.py
-│       ├── asm_paging.py
-│       ├── asm_logging.py
-│       └── asm_time.py
+│       │
+│       ├── asm_client.py              # Raw ASM API client
+│       ├── asm_auth.py                # API key handling / headers
+│       ├── asm_proxy.py               # Proxy config + validation
+│       ├── asm_retry.py               # Retry / backoff / rate-limit handling
+│       ├── asm_paging.py              # Pagination + cursor safety
+│       ├── asm_state.py               # Checkpointing, cursors, last-seen markers
+│       ├── asm_health.py              # Ingestion health + heartbeat logic
+│       ├── asm_metrics.py             # Retrieved / processed / written counters
+│       ├── asm_errors.py              # Normalized error capture
+│       ├── asm_logging.py             # Structured logging (Splunk-friendly)
+│       └── asm_time.py                # Time normalization utilities
 │
 ├── default/
 │   ├── app.conf
-│   ├── inputs.conf
+│   ├── inputs.conf                    # ASM endpoint + proxy + tuning
 │   ├── props.conf
-│   ├── savedsearches.conf
+│   ├── savedsearches.conf             # Ops / health searches
 │   ├── web.conf
 │   └── setup.xml
 │
@@ -30,6 +38,7 @@ tenable_attack_surface_management/
 ├── ui/
 │   ├── nav/
 │   │   └── default.xml
+│   │
 │   └── views/
 │       ├── asm_overview.xml
 │       ├── asm_inventory.xml
@@ -44,8 +53,9 @@ tenable_attack_surface_management/
 │       ├── asm_operations.xml
 │       └── asm_administration.xml
 │
-└── README/
-    ├── README.md
-    └── INSTALL.md
-    └── UPGRADE.md
-  
+├── README/
+│   ├── README.md
+│   ├── INSTALL.md
+│   └── OPERATIONS.md
+│
+└── LICENSE
