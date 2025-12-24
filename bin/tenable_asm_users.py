@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 # bin/tenable_asm_users.py
 #
-# Tenable Attack Surface Management – Admin Users
+# Tenable Attack Surface Management – Users
 # Endpoint: GET /api/1.0/admin/users
-#
-# Emits one event per user
 
 import json
 import sys
 import time
 import requests
 import splunk.entity as entity
-from typing import Dict, Any
-
+from typing import Dict, Any, List
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
 CONF_STANZA = "settings"
 
-BASE_URL = "https://asm.cloud.tenable.com/api/1.0/admin/users"
+API_URL = "https://asm.cloud.tenable.com/api/1.0/admin/users"
 
 
 def emit(event: Dict[str, Any]) -> None:
@@ -46,6 +43,15 @@ def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
+def flatten_companies(companies: List[Dict[str, Any]]) -> List[str]:
+    names = []
+    for c in companies or []:
+        name = c.get("name")
+        if name:
+            names.append(name)
+    return names
+
+
 def main() -> None:
     try:
         cfg = load_settings()
@@ -66,11 +72,7 @@ def main() -> None:
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        resp = session.get(
-            BASE_URL,
-            headers=headers,
-            timeout=timeout
-        )
+        resp = session.get(API_URL, headers=headers, timeout=timeout)
         resp.raise_for_status()
 
         payload = resp.json()
@@ -81,22 +83,18 @@ def main() -> None:
         for user in users:
             emit({
                 "event_type": "asm_user",
-                "id": user.get("id"),
+                "user_id": user.get("id"),
                 "email": user.get("email"),
                 "authid": user.get("authid"),
                 "access_level": user.get("access_level"),
                 "created_at": user.get("created_at"),
                 "first_login": user.get("first_login"),
-                "user_inventories_limit": user.get("user_inventories_limit"),
-                "business_id": user.get("business_id"),
                 "mfa": user.get("mfa"),
                 "ext_user_id": user.get("ext_user_id"),
                 "workspace": user.get("workspace"),
-                "companies": [
-                    c.get("name")
-                    for c in user.get("companies", [])
-                    if c.get("name")
-                ],
+                "business_id": user.get("business_id"),
+                "user_inventories_limit": user.get("user_inventories_limit"),
+                "companies": flatten_companies(user.get("companies")),
                 "retrieved_at": now
             })
 
@@ -110,4 +108,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main() 
+    main()
