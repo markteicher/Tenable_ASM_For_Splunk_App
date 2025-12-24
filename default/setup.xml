@@ -1,159 +1,127 @@
 <setup>
-  <header>
-    <title>Tenable Attack Surface Management for Splunk – Setup</title>
-    <description>
-      Configure Tenable Attack Surface Management ingestion.
-      Enter your API key, optional proxy settings, target index,
-      and select which ASM components to ingest.
-    </description>
-  </header>
+  <block title="Tenable Attack Surface Management – Setup">
 
-  <!-- ========================= -->
-  <!-- General Configuration -->
-  <!-- ========================= -->
-  <block title="General Settings">
-    <input type="text" key="asm_index">
-      <label>Target Index</label>
-      <description>
-        Splunk index where Tenable ASM data will be stored.
-        (Index must already exist.)
-      </description>
+    <!-- ========================= -->
+    <!-- Connection Configuration -->
+    <!-- ========================= -->
+
+    <input type="password">
+      <label>ASM API Key</label>
+      <name>asm_api_key</name>
+      <help>Enter your Tenable Attack Surface Management API key.</help>
+    </input>
+
+    <input type="text">
+      <label>Index Name</label>
+      <name>index</name>
       <default>security_tenable_asm</default>
+      <help>Splunk index where ASM data will be stored.</help>
     </input>
 
-    <input type="password" key="asm_api_key">
-      <label>Tenable ASM API Key</label>
-      <description>
-        API key generated from Tenable Attack Surface Management.
-      </description>
-    </input>
+    <!-- ========================= -->
+    <!-- Proxy Configuration -->
+    <!-- ========================= -->
+
+    <block title="Proxy Configuration (Optional)">
+
+      <input type="text">
+        <label>Proxy Host</label>
+        <name>proxy_host</name>
+        <help>Proxy hostname or IP (leave blank if not used).</help>
+      </input>
+
+      <input type="text">
+        <label>Proxy Port</label>
+        <name>proxy_port</name>
+        <help>Proxy port.</help>
+      </input>
+
+      <input type="text">
+        <label>Proxy Username</label>
+        <name>proxy_username</name>
+        <help>Optional proxy username.</help>
+      </input>
+
+      <input type="password">
+        <label>Proxy Password</label>
+        <name>proxy_password</name>
+        <help>Optional proxy password.</help>
+      </input>
+
+      <button>
+        <label>Test Proxy Connectivity</label>
+        <endpoint>/services/asm/proxy_test</endpoint>
+      </button>
+
+    </block>
+
+    <!-- ========================= -->
+    <!-- Authentication Test -->
+    <!-- ========================= -->
+
+    <button>
+      <label>Test ASM API Authentication</label>
+      <endpoint>/services/asm/auth_test</endpoint>
+    </button>
+
+    <!-- ========================= -->
+    <!-- ASM Component Selection -->
+    <!-- ========================= -->
+
+    <block title="ASM Components to Ingest">
+
+      <input type="checkbox">
+        <label>Enable Asset Inventory</label>
+        <name>enable_assets</name>
+        <default>true</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable Inventories</label>
+        <name>enable_inventories</name>
+        <default>true</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable Suggestions</label>
+        <name>enable_suggestions</name>
+        <default>true</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable Alerts</label>
+        <name>enable_alerts</name>
+        <default>true</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable Subscriptions</label>
+        <name>enable_subscriptions</name>
+        <default>true</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable TXT Records</label>
+        <name>enable_txt_records</name>
+        <default>false</default>
+      </input>
+
+      <input type="checkbox">
+        <label>Enable Activity Logs</label>
+        <name>enable_logs</name>
+        <default>false</default>
+      </input>
+
+    </block>
+
+    <!-- ========================= -->
+    <!-- Save Configuration -->
+    <!-- ========================= -->
+
+    <button>
+      <label>Save Configuration</label>
+      <endpoint>/services/asm/save</endpoint>
+    </button>
+
   </block>
-
-  <!-- ========================= -->
-  <!-- Proxy Configuration -->
-  <!-- ========================= -->
-  <block title="Proxy Configuration (Optional)">
-    <input type="checkbox" key="proxy_enabled">
-      <label>Enable Proxy</label>
-      <default>false</default>
-    </input>
-
-    <input type="text" key="proxy_url">
-      <label>Proxy URL</label>
-      <description>
-        Example: http://proxy.company.com:8080
-      </description>
-    </input>
-
-    <input type="text" key="proxy_username">
-      <label>Proxy Username</label>
-    </input>
-
-    <input type="password" key="proxy_password">
-      <label>Proxy Password</label>
-    </input>
-
-    <button label="Test Proxy Connectivity" action="test_proxy"/>
-  </block>
-
-  <!-- ========================= -->
-  <!-- ASM Components -->
-  <!-- ========================= -->
-  <block title="ASM Components to Ingest">
-    <input type="checkbox" key="enable_inventory">
-      <label>Inventory (Assets)</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_inventory_stats">
-      <label>Inventory Statistics</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_asset_limits">
-      <label>Asset Limits</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_suggestions">
-      <label>Suggestions</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_inventories">
-      <label>Inventories</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_activity_logs">
-      <label>User / Activity Logs</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_subscriptions">
-      <label>Subscriptions</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_txt_records">
-      <label>TXT Records</label>
-      <default>true</default>
-    </input>
-
-    <input type="checkbox" key="enable_dashboard">
-      <label>Dashboard Summary</label>
-      <default>true</default>
-    </input>
-  </block>
-
-  <!-- ========================= -->
-  <!-- Collection Intervals -->
-  <!-- ========================= -->
-  <block title="Collection Intervals (Seconds)">
-    <input type="text" key="interval_inventory">
-      <label>Inventory Interval</label>
-      <default>3600</default>
-    </input>
-
-    <input type="text" key="interval_inventory_stats">
-      <label>Inventory Statistics Interval</label>
-      <default>3600</default>
-    </input>
-
-    <input type="text" key="interval_asset_limit">
-      <label>Asset Limit Interval</label>
-      <default>86400</default>
-    </input>
-
-    <input type="text" key="interval_suggestions">
-      <label>Suggestions Interval</label>
-      <default>3600</default>
-    </input>
-
-    <input type="text" key="interval_inventories">
-      <label>Inventories Interval</label>
-      <default>3600</default>
-    </input>
-
-    <input type="text" key="interval_activity">
-      <label>Activity Log Interval</label>
-      <default>900</default>
-    </input>
-
-    <input type="text" key="interval_subscriptions">
-      <label>Subscriptions Interval</label>
-      <default>86400</default>
-    </input>
-
-    <input type="text" key="interval_txt_records">
-      <label>TXT Records Interval</label>
-      <default>86400</default>
-    </input>
-
-    <input type="text" key="interval_dashboard">
-      <label>Dashboard Summary Interval</label>
-      <default>900</default>
-    </input>
-  </block>
-
 </setup>
