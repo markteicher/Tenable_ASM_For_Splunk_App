@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-import json
-import sys
 import requests
 import splunk.admin as admin
 from splunk.entity import getEntity
 
+GOOGLE_TEST_URL = "https://www.google.com/generate_204"
 ASM_TEST_URL = "https://asm.cloud.tenable.com/api/1.0/global"
 
 class ProxyTestHandler(admin.MConfigHandler):
 
     def handleList(self, confInfo):
+
+        results = []
+
         try:
-            # Read saved setup values
             settings = getEntity(
                 'configs/conf-tenable_asm',
                 'settings',
@@ -29,11 +30,6 @@ class ProxyTestHandler(admin.MConfigHandler):
             if not api_key:
                 raise Exception("ASM API key is not configured")
 
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {api_key}"
-            }
-
             proxies = None
             if proxy_host and proxy_port:
                 if proxy_user and proxy_pass:
@@ -46,24 +42,51 @@ class ProxyTestHandler(admin.MConfigHandler):
                     "https": proxy_url
                 }
 
-            r = requests.get(
-                ASM_TEST_URL,
-                headers=headers,
-                proxies=proxies,
-                timeout=15
-            )
+            # ----------------------------
+            # Stage 1: Internet test
+            # ----------------------------
+            try:
+                r = requests.get(
+                    GOOGLE_TEST_URL,
+                    proxies=proxies,
+                    timeout=10
+                )
+                r.raise_for_status()
+                results.append("✔ Internet connectivity via proxy: OK")
+            except Exception as e:
+                results.append(f"✖ Internet connectivity via proxy FAILED: {e}")
+                raise
 
-            r.raise_for_status()
+            # ----------------------------
+            # Stage 2: ASM API test
+            # ----------------------------
+            headers = {
+                "accept": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            try:
+                r = requests.get(
+                    ASM_TEST_URL,
+                    headers=headers,
+                    proxies=proxies,
+                    timeout=15
+                )
+                r.raise_for_status()
+                results.append("✔ Tenable ASM API connectivity: OK")
+            except Exception as e:
+                results.append(f"✖ Tenable ASM API connectivity FAILED: {e}")
+                raise
 
             confInfo['result'].append({
                 'status': 'success',
-                'message': 'Proxy connection successful'
+                'details': results
             })
 
-        except Exception as e:
+        except Exception:
             confInfo['result'].append({
                 'status': 'error',
-                'message': str(e)
+                'details': results
             })
 
 admin.init(ProxyTestHandler, admin.CONTEXT_NONE)
