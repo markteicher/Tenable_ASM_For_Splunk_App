@@ -1,295 +1,236 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Tenable Attack Surface Management – REST Handler
-Handles setup, validation, and input control for the Splunk App
+------------------------------------------------
+Responsibilities:
+- Save ASM configuration (API key, index, proxy)
+- Enable/disable modular inputs
+- Test proxy connectivity (google.com + asm.cloud.tenable.com)
+- Test ASM API authentication
+- Persist settings into asm_settings.conf
 """
 
 import json
-import socket
 import time
+import socket
+import ssl
+import urllib.request
+from urllib.error import URLError, HTTPError
 
-import requests
-from splunk.persistconn.application import PersistentServerConnectionApplication
-from splunk.rest import simpleRequest
+import splunk.admin as admin
+import splunk.entity as entity
 
+
+APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
-CONF_STANZA = "global"
+CONF_STANZA = "settings"
 
 
-class ASMRestHandler(PersistentServerConnectionApplication):
-    """
-    REST handler for Tenable ASM Splunk App
-    """
+ASM_BASE_URL = "https://asm.cloud.tenable.com"
+PROXY_TEST_URLS = [
+    "https://www.google.com",
+    ASM_BASE_URL
+]
 
-    # ---------- Utility Methods ----------
 
-    def _read_conf(self):
-        _, content = simpleRequest(
-            f"/servicesNS/nobody/{self.app_name}/configs/conf-{CONF_FILE}",
-            method="GET",
-            getargs={"output_mode": "json"},
+# ------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------
+
+def _now_ms():
+    return int(time.time() * 1000)
+
+
+def _write_conf(settings: dict):
+    entity.setEntity(
+        f"configs/conf-{CONF_FILE}",
+        CONF_STANZA,
+        settings,
+        namespace=APP_NAME,
+        owner="nobody"
+    )
+
+
+def _read_conf():
+    try:
+        return entity.getEntity(
+            f"configs/conf-{CONF_FILE}",
+            CONF_STANZA,
+            namespace=APP_NAME,
+            owner="nobody"
         )
-        data = json.loads(content)
-        return data["entry"][0]["content"]
+    except Exception:
+        return {}
 
-    def _write_conf(self, settings: dict):
-        for key, value in settings.items():
-            simpleRequest(
-                f"/servicesNS/nobody/{self.app_name}/configs/conf-{CONF_FILE}/{CONF_STANZA}",
-                method="POST",
-                postargs={key: value},
-            )
 
-    def _build_proxy(self, cfg: dict):
-        if cfg.get("proxy_enabled") != "true":
-            return None
+def _proxy_handler(proxy):
+    if not proxy:
+        return None
+    return urllib.request.ProxyHandler({
+        "http": proxy,
+        "https": proxy
+    })
 
-        scheme = cfg.get("proxy_scheme", "http")
-        host = cfg.get("proxy_host")
-        port = cfg.get("proxy_port")
 
-        if not host or not port:
-            raise ValueError("Proxy enabled but host/port missing")
+def _http_request(url, headers=None, proxy=None, timeout=10):
+    handlers = []
+    if proxy:
+        handlers.append(_proxy_handler(proxy))
+    opener = urllib.request.build_opener(*handlers)
+    req = urllib.request.Request(url, headers=headers or {})
+    return opener.open(req, timeout=timeout)
 
-        auth = ""
-        if cfg.get("proxy_username") and cfg.get("proxy_password"):
-            auth = f"{cfg['proxy_username']}:{cfg['proxy_password']}@"
 
-        proxy_url = f"{scheme}://{auth}{host}:{port}"
-        return {"http": proxy_url, "https": proxy_url}
+# ------------------------------------------------------------
+# Tests
+# ------------------------------------------------------------
 
-    # ---------- REST Handlers ----------
+def test_proxy(proxy_url: str):
+    results = []
+    for url in PROXY_TEST_URLS:
+        start = _now_ms()
+        try:
+            resp = _http_request(url, proxy=proxy_url)
+            latency = _now_ms() - start
+            tls = resp.fp.raw._sock.version() if hasattr(resp.fp.raw, "_sock") else None
+            results.append({
+                "url": url,
+                "status": "success",
+                "http_status": resp.status,
+                "latency_ms": latency,
+                "tls_version": tls
+            })
+        except Exception as e:
+            latency = _now_ms() - start
+            results.append({
+                "url": url,
+                "status": "failure",
+                "error": str(e),
+                "latency_ms": latency
+            })
+    return results
 
-    def get_config(self, request):
-        cfg = self._read_conf()
+
+def test_auth(api_key: str, proxy: str = None):
+    headers = {
+        "accept": "application/json",
+        "Authorization": api_key
+    }
+    try:
+        resp = _http_request(
+            f"{ASM_BASE_URL}/api/1.0/inventory",
+            headers=headers,
+            proxy=proxy
+        )
         return {
-            "status": 200,
-            "payload": cfg,
+            "status": "success",
+            "http_status": resp.status
         }
-
-    def save_config(self, request):
-        payload = json.loads(request.get("payload") or "{}")
-        self._write_conf(payload)
+    except HTTPError as e:
         return {
-            "status": 200,
-            "payload": {"message": "Configuration saved"},
+            "status": "failure",
+            "http_status": e.code,
+            "error": e.read().decode("utf-8", errors="ignore")
+        }
+    except Exception as e:
+        return {
+            "status": "failure",
+            "error": str(e)
         }
 
-    def test_auth(self, request):
-        payload = json.loads(request.get("payload") or "{}")
-        api_key = payload.get("asm_api_key")
 
-        if not api_key:
-            return {"status": 400, "payload": {"error": "API key missing"}}
+def set_input_state(script_name: str, enabled: bool):
+    stanza = f"script://./bin/{script_name}"
+    entity.setEntity(
+        "configs/conf-inputs",
+        stanza,
+        {"disabled": "0" if enabled else "1"},
+        namespace=APP_NAME,
+        owner="nobody"
+    )
 
-        headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+
+# ------------------------------------------------------------
+# REST Controller
+# ------------------------------------------------------------
+
+class ASMRestHandler(admin.MConfigHandler):
+
+    def setup(self):
+        for arg in [
+            "action",
+            "api_key",
+            "proxy",
+            "index",
+            "inputs"
+        ]:
+            self.supportedArgs.addOptArg(arg)
+
+    def handle(self):
+        action = self.callerArgs.get("action", [""])[0]
+
+        if action == "save":
+            self._handle_save()
+        elif action == "proxy_test":
+            self._handle_proxy_test()
+        elif action == "auth_test":
+            self._handle_auth_test()
+        else:
+            raise admin.ArgValidationException("Invalid action")
+
+    # --------------------------------------------------------
+
+    def _handle_save(self):
+        api_key = self.callerArgs.get("api_key", [""])[0]
+        proxy = self.callerArgs.get("proxy", [""])[0]
+        index = self.callerArgs.get("index", [""])[0]
+        inputs_raw = self.callerArgs.get("inputs", ["[]"])[0]
 
         try:
-            r = requests.get(
-                "https://asm.cloud.tenable.com/api/1.0/global",
-                headers=headers,
-                timeout=10,
-            )
-            r.raise_for_status()
-        except Exception as e:
-            return {"status": 401, "payload": {"error": str(e)}}
+            inputs = json.loads(inputs_raw)
+        except Exception:
+            raise admin.ArgValidationException("Invalid inputs JSON")
 
-        return {"status": 200, "payload": {"message": "Authentication successful"}}
-
-    # ---------- HARDENED PROXY TEST ----------
-
-    def test_proxy(self, request):
-        payload = json.loads(request.get("payload") or "{}")
-
-        # Accept proxy fields either directly from the setup button post,
-        # or in the persisted config format.
-        cfg = payload.copy()
-
-        test_url = payload.get("test_url") or "https://www.google.com"
-        timeout = int(payload.get("timeout") or 10)
-
-        result = {
-            "success": False,
-            "test_url": test_url,
-            "final_url": None,
-            "http_status": None,
-            "latency_ms": None,
-            "resolved_ip": None,
-            "tls": {
-                "tls_version": None,
-                "cipher": None,
-            },
-            "cert": {
-                "subject_cn": None,
-                "issuer_cn": None,
-                "not_before": None,
-                "not_after": None,
-                "sans_count": None,
-            },
-            "error": None,
+        settings = {
+            "api_key": api_key,
+            "proxy": proxy,
+            "index": index,
+            "last_updated": str(int(time.time()))
         }
 
-        try:
-            # Best-effort DNS resolution for reporting
-            try:
-                host = test_url.split("://", 1)[-1].split("/", 1)[0]
-                result["resolved_ip"] = socket.gethostbyname(host)
-            except Exception:
-                pass
+        _write_conf(settings)
 
-            proxies = self._build_proxy(cfg)  # uses proxy_enabled + host/port/etc.
+        for script, enabled in inputs.items():
+            set_input_state(script, enabled)
 
-            start = time.time()
+        self.writeResponse({
+            "status": "success",
+            "message": "Configuration saved"
+        })
 
-            # stream=True to best-effort expose the underlying socket for TLS introspection
-            r = requests.get(
-                test_url,
-                proxies=proxies,
-                timeout=timeout,
-                verify=True,
-                allow_redirects=True,
-                stream=True,
-                headers={"User-Agent": "Splunk-ASM-ProxyTest/1.0"},
-            )
+    # --------------------------------------------------------
 
-            result["latency_ms"] = round((time.time() - start) * 1000.0, 2)
-            result["http_status"] = r.status_code
-            result["final_url"] = r.url
+    def _handle_proxy_test(self):
+        proxy = self.callerArgs.get("proxy", [""])[0]
+        result = test_proxy(proxy)
+        self.writeResponse({
+            "status": "ok",
+            "results": result
+        })
 
-            # Raise for non-2xx to keep failure shape consistent
-            r.raise_for_status()
+    # --------------------------------------------------------
 
-            # --- TLS details (best effort; depends on Python/urllib3 internals) ---
-            sock = None
-            try:
-                sock = getattr(getattr(getattr(r, "raw", None), "connection", None), "sock", None)
-            except Exception:
-                sock = None
+    def _handle_auth_test(self):
+        api_key = self.callerArgs.get("api_key", [""])[0]
+        proxy = self.callerArgs.get("proxy", [""])[0]
+        result = test_auth(api_key, proxy)
+        self.writeResponse(result)
 
-            if sock:
-                try:
-                    result["tls"]["tls_version"] = getattr(sock, "version", lambda: None)()
-                except Exception:
-                    pass
 
-                try:
-                    c = getattr(sock, "cipher", lambda: None)()
-                    result["tls"]["cipher"] = c[0] if isinstance(c, tuple) and len(c) > 0 else str(c)
-                except Exception:
-                    pass
+# ------------------------------------------------------------
+# Entrypoint
+# ------------------------------------------------------------
 
-                # Certificate parsing is also best-effort (format differs by environment)
-                try:
-                    cert = sock.getpeercert() or {}
-                except Exception:
-                    cert = {}
-
-                try:
-                    subj = cert.get("subject") or []
-                    for entry in subj:
-                        for k, v in entry:
-                            if str(k).lower() == "commonname":
-                                result["cert"]["subject_cn"] = v
-                                raise StopIteration
-                except StopIteration:
-                    pass
-                except Exception:
-                    pass
-
-                try:
-                    iss = cert.get("issuer") or []
-                    for entry in iss:
-                        for k, v in entry:
-                            if str(k).lower() == "commonname":
-                                result["cert"]["issuer_cn"] = v
-                                raise StopIteration
-                except StopIteration:
-                    pass
-                except Exception:
-                    pass
-
-                try:
-                    result["cert"]["not_before"] = cert.get("notBefore")
-                    result["cert"]["not_after"] = cert.get("notAfter")
-                    sans = cert.get("subjectAltName") or []
-                    result["cert"]["sans_count"] = len(sans) if isinstance(sans, list) else None
-                except Exception:
-                    pass
-
-            result["success"] = True
-            return {"status": 200, "payload": result}
-
-        except requests.exceptions.SSLError as e:
-            result["error"] = f"TLS/SSL error: {e}"
-            return {"status": 502, "payload": result}
-
-        except requests.exceptions.ProxyError as e:
-            result["error"] = f"Proxy error: {e}"
-            return {"status": 502, "payload": result}
-
-        except requests.exceptions.ConnectTimeout as e:
-            result["error"] = f"Connect timeout: {e}"
-            return {"status": 504, "payload": result}
-
-        except requests.exceptions.ReadTimeout as e:
-            result["error"] = f"Read timeout: {e}"
-            return {"status": 504, "payload": result}
-
-        except requests.exceptions.HTTPError as e:
-            result["error"] = f"HTTP error: {e}"
-            return {"status": 502, "payload": result}
-
-        except Exception as e:
-            result["error"] = f"Unexpected error: {e}"
-            return {"status": 502, "payload": result}
-
-    def apply_inputs(self, request):
-        cfg = self._read_conf()
-        index = cfg.get("asm_index")
-
-        if not index:
-            return {"status": 400, "payload": {"error": "Index not configured"}}
-
-        input_map = {
-            "enable_assets": "tenable_asm_assets.py",
-            "enable_inventories": "tenable_asm_inventories.py",
-            "enable_suggestions": "tenable_asm_suggestions.py",
-            "enable_alerts": "tenable_asm_alerts.py",
-            "enable_subscriptions": "tenable_asm_subscriptions.py",
-            "enable_txt_records": "tenable_asm_txt_records.py",
-            "enable_activity_logs": "tenable_asm_logs.py",
-        }
-
-        for flag, script in input_map.items():
-            enabled = cfg.get(flag) == "true"
-            simpleRequest(
-                f"/servicesNS/nobody/{self.app_name}/data/inputs/script/{script}",
-                method="POST",
-                postargs={
-                    "disabled": "0" if enabled else "1",
-                    "index": index,
-                },
-            )
-
-        return {"status": 200, "payload": {"message": "Inputs applied"}}
-
-    # ---------- Dispatcher ----------
-
-    def handle(self, args):
-        path = args["path"].strip("/")
-
-        if path.endswith("/config/get"):
-            return self.get_config(args)
-        if path.endswith("/config/save"):
-            return self.save_config(args)
-        if path.endswith("/auth/test"):
-            return self.test_auth(args)
-        if path.endswith("/proxy/test"):
-            return self.test_proxy(args)
-        if path.endswith("/inputs/apply"):
-            return self.apply_inputs(args)
-
-        return {"status": 404, "payload": {"error": "Unknown endpoint"}}
+admin.init(ASMRestHandler, admin.CONTEXT_NONE)
