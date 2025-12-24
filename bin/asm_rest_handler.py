@@ -7,10 +7,10 @@ Handles setup, validation, and input control for the Splunk App
 import json
 import socket
 import time
-import requests
 
-from splunk.rest import simpleRequest
+import requests
 from splunk.persistconn.application import PersistentServerConnectionApplication
+from splunk.rest import simpleRequest
 
 CONF_FILE = "asm_settings"
 CONF_STANZA = "global"
@@ -68,7 +68,7 @@ class ASMRestHandler(PersistentServerConnectionApplication):
         }
 
     def save_config(self, request):
-        payload = json.loads(request["payload"])
+        payload = json.loads(request.get("payload") or "{}")
         self._write_conf(payload)
         return {
             "status": 200,
@@ -76,14 +76,11 @@ class ASMRestHandler(PersistentServerConnectionApplication):
         }
 
     def test_auth(self, request):
-        payload = json.loads(request["payload"])
+        payload = json.loads(request.get("payload") or "{}")
         api_key = payload.get("asm_api_key")
 
         if not api_key:
-            return {
-                "status": 400,
-                "payload": {"error": "API key missing"},
-            }
+            return {"status": 400, "payload": {"error": "API key missing"}}
 
         headers = {
             "accept": "application/json",
@@ -98,56 +95,163 @@ class ASMRestHandler(PersistentServerConnectionApplication):
             )
             r.raise_for_status()
         except Exception as e:
-            return {
-                "status": 401,
-                "payload": {"error": str(e)},
-            }
+            return {"status": 401, "payload": {"error": str(e)}}
 
-        return {
-            "status": 200,
-            "payload": {"message": "Authentication successful"},
-        }
+        return {"status": 200, "payload": {"message": "Authentication successful"}}
+
+    # ---------- HARDENED PROXY TEST ----------
 
     def test_proxy(self, request):
-        payload = json.loads(request["payload"])
+        payload = json.loads(request.get("payload") or "{}")
+
+        # Accept proxy fields either directly from the setup button post,
+        # or in the persisted config format.
         cfg = payload.copy()
 
-        try:
-            proxies = self._build_proxy(cfg)
-            start = time.time()
-            r = requests.get(
-                "https://www.google.com",
-                proxies=proxies,
-                timeout=10,
-            )
-            latency = round((time.time() - start) * 1000, 2)
-            r.raise_for_status()
-        except Exception as e:
-            return {
-                "status": 502,
-                "payload": {
-                    "error": "Proxy test failed",
-                    "detail": str(e),
-                },
-            }
+        test_url = payload.get("test_url") or "https://www.google.com"
+        timeout = int(payload.get("timeout") or 10)
 
-        return {
-            "status": 200,
-            "payload": {
-                "message": "Proxy connectivity successful",
-                "latency_ms": latency,
+        result = {
+            "success": False,
+            "test_url": test_url,
+            "final_url": None,
+            "http_status": None,
+            "latency_ms": None,
+            "resolved_ip": None,
+            "tls": {
+                "tls_version": None,
+                "cipher": None,
             },
+            "cert": {
+                "subject_cn": None,
+                "issuer_cn": None,
+                "not_before": None,
+                "not_after": None,
+                "sans_count": None,
+            },
+            "error": None,
         }
+
+        try:
+            # Best-effort DNS resolution for reporting
+            try:
+                host = test_url.split("://", 1)[-1].split("/", 1)[0]
+                result["resolved_ip"] = socket.gethostbyname(host)
+            except Exception:
+                pass
+
+            proxies = self._build_proxy(cfg)  # uses proxy_enabled + host/port/etc.
+
+            start = time.time()
+
+            # stream=True to best-effort expose the underlying socket for TLS introspection
+            r = requests.get(
+                test_url,
+                proxies=proxies,
+                timeout=timeout,
+                verify=True,
+                allow_redirects=True,
+                stream=True,
+                headers={"User-Agent": "Splunk-ASM-ProxyTest/1.0"},
+            )
+
+            result["latency_ms"] = round((time.time() - start) * 1000.0, 2)
+            result["http_status"] = r.status_code
+            result["final_url"] = r.url
+
+            # Raise for non-2xx to keep failure shape consistent
+            r.raise_for_status()
+
+            # --- TLS details (best effort; depends on Python/urllib3 internals) ---
+            sock = None
+            try:
+                sock = getattr(getattr(getattr(r, "raw", None), "connection", None), "sock", None)
+            except Exception:
+                sock = None
+
+            if sock:
+                try:
+                    result["tls"]["tls_version"] = getattr(sock, "version", lambda: None)()
+                except Exception:
+                    pass
+
+                try:
+                    c = getattr(sock, "cipher", lambda: None)()
+                    result["tls"]["cipher"] = c[0] if isinstance(c, tuple) and len(c) > 0 else str(c)
+                except Exception:
+                    pass
+
+                # Certificate parsing is also best-effort (format differs by environment)
+                try:
+                    cert = sock.getpeercert() or {}
+                except Exception:
+                    cert = {}
+
+                try:
+                    subj = cert.get("subject") or []
+                    for entry in subj:
+                        for k, v in entry:
+                            if str(k).lower() == "commonname":
+                                result["cert"]["subject_cn"] = v
+                                raise StopIteration
+                except StopIteration:
+                    pass
+                except Exception:
+                    pass
+
+                try:
+                    iss = cert.get("issuer") or []
+                    for entry in iss:
+                        for k, v in entry:
+                            if str(k).lower() == "commonname":
+                                result["cert"]["issuer_cn"] = v
+                                raise StopIteration
+                except StopIteration:
+                    pass
+                except Exception:
+                    pass
+
+                try:
+                    result["cert"]["not_before"] = cert.get("notBefore")
+                    result["cert"]["not_after"] = cert.get("notAfter")
+                    sans = cert.get("subjectAltName") or []
+                    result["cert"]["sans_count"] = len(sans) if isinstance(sans, list) else None
+                except Exception:
+                    pass
+
+            result["success"] = True
+            return {"status": 200, "payload": result}
+
+        except requests.exceptions.SSLError as e:
+            result["error"] = f"TLS/SSL error: {e}"
+            return {"status": 502, "payload": result}
+
+        except requests.exceptions.ProxyError as e:
+            result["error"] = f"Proxy error: {e}"
+            return {"status": 502, "payload": result}
+
+        except requests.exceptions.ConnectTimeout as e:
+            result["error"] = f"Connect timeout: {e}"
+            return {"status": 504, "payload": result}
+
+        except requests.exceptions.ReadTimeout as e:
+            result["error"] = f"Read timeout: {e}"
+            return {"status": 504, "payload": result}
+
+        except requests.exceptions.HTTPError as e:
+            result["error"] = f"HTTP error: {e}"
+            return {"status": 502, "payload": result}
+
+        except Exception as e:
+            result["error"] = f"Unexpected error: {e}"
+            return {"status": 502, "payload": result}
 
     def apply_inputs(self, request):
         cfg = self._read_conf()
         index = cfg.get("asm_index")
 
         if not index:
-            return {
-                "status": 400,
-                "payload": {"error": "Index not configured"},
-            }
+            return {"status": 400, "payload": {"error": "Index not configured"}}
 
         input_map = {
             "enable_assets": "tenable_asm_assets.py",
@@ -170,10 +274,7 @@ class ASMRestHandler(PersistentServerConnectionApplication):
                 },
             )
 
-        return {
-            "status": 200,
-            "payload": {"message": "Inputs applied"},
-        }
+        return {"status": 200, "payload": {"message": "Inputs applied"}}
 
     # ---------- Dispatcher ----------
 
@@ -191,7 +292,4 @@ class ASMRestHandler(PersistentServerConnectionApplication):
         if path.endswith("/inputs/apply"):
             return self.apply_inputs(args)
 
-        return {
-            "status": 404,
-            "payload": {"error": "Unknown endpoint"},
-        }
+        return {"status": 404, "payload": {"error": "Unknown endpoint"}}
