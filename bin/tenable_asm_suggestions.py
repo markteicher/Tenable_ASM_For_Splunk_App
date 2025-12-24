@@ -3,13 +3,14 @@
 #
 # Tenable Attack Surface Management – Suggestions
 # Endpoint: POST /api/1.0/suggestions/list
+# Supports archived + non-archived suggestions
 
 import json
 import sys
 import time
 import requests
 import splunk.entity as entity
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
@@ -43,6 +44,24 @@ def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
+def fetch_suggestions(
+    session: requests.Session,
+    headers: Dict[str, str],
+    is_archived: bool,
+    timeout: int
+) -> List[Dict[str, Any]]:
+
+    payload = {
+        "is_archived": is_archived
+    }
+
+    resp = session.post(API_URL, headers=headers, json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+
+    return data.get("suggestions", [])
+
+
 def main() -> None:
     try:
         cfg = load_settings()
@@ -64,39 +83,28 @@ def main() -> None:
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        payload = {
-            "is_archived": True
-        }
+        now = int(time.time())
 
-        resp = session.post(API_URL, headers=headers, json=payload, timeout=timeout)
-        resp.raise_for_status()
+        for archived_flag in (False, True):
+            suggestions = fetch_suggestions(
+                session=session,
+                headers=headers,
+                is_archived=archived_flag,
+                timeout=timeout
+            )
 
-        data = resp.json()
-        suggestions = data.get("suggestions", [])
-
-        retrieved_at = int(time.time())
-
-        for s in suggestions:
-            base_event = {
-                "event_type": "asm_suggestion",
-                "suggestion_id": s.get("id"),
-                "suggestion_text": s.get("suggestion_text"),
-                "suggestion_type": s.get("suggestion_type"),
-                "created_at": s.get("created_at"),
-                "deleted_at": s.get("deleted_at"),
-                "retrieved_at": retrieved_at
-            }
-
-            rules = s.get("suggestion_details", {}).get("rules", [])
-            if rules:
-                for r in rules:
-                    emit({
-                        **base_event,
-                        "rule": r.get("rule"),
-                        "rule_description": r.get("description")
-                    })
-            else:
-                emit(base_event)
+            for s in suggestions:
+                emit({
+                    "event_type": "asm_suggestion",
+                    "suggestion_id": s.get("id"),
+                    "suggestion_text": s.get("suggestion_text"),
+                    "suggestion_type": s.get("suggestion_type"),
+                    "rules": s.get("suggestion_details", {}).get("rules", []),
+                    "created_at": s.get("created_at"),
+                    "deleted_at": s.get("deleted_at"),
+                    "is_archived": archived_flag,
+                    "retrieved_at": now
+                })
 
     except Exception as exc:
         emit({
