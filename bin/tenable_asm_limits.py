@@ -2,9 +2,9 @@
 # bin/tenable_asm_limits.py
 #
 # Tenable Attack Surface Management – Asset Limits
-# Endpoint: GET /api/1.0/assets/limit
+# Endpoint: GET /api/1.0/asset-limit
 #
-# Emits a single JSON event per run
+# Emits a single event representing current ASM limits state
 
 import json
 import sys
@@ -18,7 +18,7 @@ APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
 CONF_STANZA = "settings"
 
-BASE_URL = "https://asm.cloud.tenable.com/api/1.0/assets/limit"
+BASE_URL = "https://asm.cloud.tenable.com/api/1.0/asset-limit"
 
 
 def emit(event: Dict[str, Any]) -> None:
@@ -73,13 +73,14 @@ def main() -> None:
         )
         resp.raise_for_status()
 
-        payload = resp.json()
+        data = resp.json()
+        now = int(time.time())
 
         emit({
             "event_type": "asm_asset_limit",
-            "asset_limit": payload.get("asset_limit"),
-            "limit_reached": payload.get("limit_reached"),
-            "retrieved_at": int(time.time())
+            "asset_limit": data.get("asset_limit"),
+            "limit_reached": data.get("limit_reached"),
+            "retrieved_at": now
         })
 
     except Exception as exc:
