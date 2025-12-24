@@ -4,14 +4,14 @@
 # Tenable Attack Surface Management – User Action Logs
 # Endpoint: GET /api/1.0/logs
 #
-# Emits one JSON event per action
+# Emits one event per action log entry
 
 import json
 import sys
 import time
 import requests
 import splunk.entity as entity
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
@@ -19,7 +19,6 @@ CONF_FILE = "asm_settings"
 CONF_STANZA = "settings"
 
 BASE_URL = "https://asm.cloud.tenable.com/api/1.0/logs"
-PAGE_SIZE = 100
 
 
 def emit(event: Dict[str, Any]) -> None:
@@ -67,49 +66,35 @@ def main() -> None:
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        offset = 0
+        resp = session.get(
+            BASE_URL,
+            headers=headers,
+            timeout=timeout
+        )
+        resp.raise_for_status()
 
-        while True:
-            params = {
-                "limit": PAGE_SIZE,
-                "offset": offset
-            }
+        payload = resp.json()
+        logs = payload.get("list", [])
 
-            resp = session.get(
-                BASE_URL,
-                headers=headers,
-                params=params,
-                timeout=timeout
-            )
-            resp.raise_for_status()
+        now = int(time.time())
 
-            payload = resp.json()
-            events: List[Dict[str, Any]] = payload.get("list", [])
-
-            if not events:
-                break
-
-            for ev in events:
-                emit({
-                    "event_type": "asm_user_action",
-                    "id": ev.get("id"),
-                    "action": ev.get("action"),
-                    "target": ev.get("target"),
-                    "actor": ev.get("actor"),
-                    "actor_id": ev.get("actor_id"),
-                    "inventory_id": ev.get("inventory_id"),
-                    "description_values": ev.get("description_values"),
-                    "created_at": ev.get("created_at")
-                })
-
-            if len(events) < PAGE_SIZE:
-                break
-
-            offset += PAGE_SIZE
+        for entry in logs:
+            emit({
+                "event_type": "asm_user_action",
+                "id": entry.get("id"),
+                "action": entry.get("action"),
+                "target": entry.get("target"),
+                "actor": entry.get("actor"),
+                "actor_id": entry.get("actor_id"),
+                "inventory_id": entry.get("inventory_id"),
+                "description_values": entry.get("description_values"),
+                "created_at": entry.get("created_at"),
+                "retrieved_at": now
+            })
 
     except Exception as exc:
         emit({
-            "event_type": "asm_user_actions_error",
+            "event_type": "asm_user_action_error",
             "error": str(exc),
             "ts": int(time.time())
         })
