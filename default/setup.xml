@@ -1,24 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <setup>
-  <header>Tenable Attack Surface Management for Splunk</header>
+  <header>Tenable Attack Surface Management for Splunk – Setup</header>
 
-  <block title="Tenable ASM Connection">
-    <text>
-      Enter your Tenable Attack Surface Management API key.
-    </text>
+  <!-- ========================= -->
+  <!-- AUTHENTICATION -->
+  <!-- ========================= -->
+  <block title="Authentication">
+    <text>Enter your Tenable ASM API key.</text>
 
     <input type="password">
       <label>ASM API Key</label>
       <key>asm_api_key</key>
-      <help>
-        API key used to authenticate to asm.cloud.tenable.com
-      </help>
     </input>
   </block>
 
+  <!-- ========================= -->
+  <!-- PROXY CONFIGURATION + TEST -->
+  <!-- ========================= -->
   <block title="Proxy Configuration (Optional)">
-    <text>
-      Configure an outbound proxy if required to reach Tenable ASM.
-    </text>
+    <text>Configure a proxy if required to reach asm.cloud.tenable.com.</text>
 
     <input type="text">
       <label>Proxy Host</label>
@@ -41,51 +41,61 @@
       <label>Proxy Password</label>
       <key>proxy_pass</key>
     </input>
+
+    <!-- Test button: uses saved settings (after Save). -->
+    <html>
+      <![CDATA[
+      <div style="margin-top:10px;">
+        <a class="btn btn-primary" href="/app/tenable_attack_surface_management/proxy_test">
+          Test Proxy
+        </a>
+        <div style="margin-top:6px; color:#666;">
+          Note: Save first, then click <b>Test Proxy</b> to validate the configured proxy using the saved settings.
+        </div>
+      </div>
+      ]]>
+    </html>
   </block>
 
+  <!-- ========================= -->
+  <!-- SPLUNK INDEX -->
+  <!-- ========================= -->
   <block title="Splunk Index">
-    <text>
-      Specify the Splunk index where Tenable ASM data will be stored.
-      The index must already exist.
-    </text>
+    <text>Specify the Splunk index where ASM data will be stored. The index must already exist.</text>
 
     <input type="text">
       <label>Target Index</label>
       <key>asm_index</key>
       <default>security_tenable_asm</default>
-      <help>
-        Example: security_tenable_asm
-      </help>
     </input>
   </block>
 
-  <block title="ASM Data Components">
-    <text>
-      Select which Tenable ASM components should be ingested.
-    </text>
+  <!-- ========================= -->
+  <!-- ASM COMPONENT CHECKBOXES -->
+  <!-- ========================= -->
+  <block title="Enable ASM Components">
+    <text>Select which ASM data components should be enabled.</text>
 
     <input type="checkbox">
-      <label>Enable Components</label>
+      <label>Components</label>
       <key>enabled_components</key>
 
       <choice value="assets">Assets</choice>
-      <choice value="inventory">Inventory</choice>
+      <choice value="inventories">Inventories</choice>
       <choice value="suggestions">Suggestions</choice>
+      <choice value="sources">Sources</choice>
+      <choice value="tags">Tags</choice>
       <choice value="subscriptions">Subscriptions</choice>
       <choice value="alerts">Alerts</choice>
-      <choice value="logs">User Activity Logs</choice>
       <choice value="txt_records">TXT Records</choice>
+      <choice value="user_action_logs">User Action Logs</choice>
       <choice value="dashboard">Dashboard Summary</choice>
-      <choice value="tags">Tags</choice>
-      <choice value="sources">Sources</choice>
 
-      <default>assets,inventory,suggestions</default>
+      <default>assets,inventories,suggestions</default>
     </input>
   </block>
 
   <block title="Save Configuration">
-    <text>
-      Click Save to apply configuration and enable data collection.
-    </text>
+    <text>Click Save to store settings.</text>
   </block>
 </setup>
