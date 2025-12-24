@@ -7,9 +7,10 @@
 import json
 import sys
 import time
+from typing import Any, Dict
+
 import requests
 import splunk.entity as entity
-from typing import Dict, Any
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
@@ -44,6 +45,8 @@ def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
 
 
 def main() -> None:
+    now = int(time.time())
+
     try:
         cfg = load_settings()
 
@@ -56,7 +59,7 @@ def main() -> None:
 
         headers = {
             "accept": "application/json",
-            "Authorization": api_key
+            "Authorization": api_key,
         }
 
         session = requests.Session()
@@ -69,8 +72,6 @@ def main() -> None:
         payload = resp.json()
         inventories = payload.get("list", [])
 
-        now = int(time.time())
-
         for inv in inventories:
             emit({
                 "event_type": "asm_inventory",
@@ -78,22 +79,14 @@ def main() -> None:
                 "inventory_name": inv.get("inventory_name"),
                 "current_asset_count": inv.get("current_asset_count"),
                 "source_suggestions": inv.get("source_suggestions"),
-                "users_total": inv.get("users_total"),
                 "business_id": inv.get("business_id"),
+                "users_total": inv.get("users_total"),
                 "api_key_present": bool(inv.get("api_key")),
                 "enumeration_wordlist": inv.get("enumeration_wordlist"),
                 "has_custom_wordlist": inv.get("has_custom_wordlist"),
-                "retrieved_at": now
+                "retrieved_at": now,
             })
 
     except Exception as exc:
         emit({
             "event_type": "asm_inventory_error",
-            "error": str(exc),
-            "ts": int(time.time())
-        })
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
