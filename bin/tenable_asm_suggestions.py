@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 # bin/tenable_asm_suggestions.py
 #
-# Tenable ASM – Suggestions (active + archived)
-# Endpoint: POST https://asm.cloud.tenable.com/api/1.0/suggestions/list?is_archived={true|false}
-#
-# Output: one JSON event per suggestion, including all suggestion fields returned by the API.
-# Adds only: is_archived (request context).
+# Tenable Attack Surface Management – Suggestions
+# Endpoint: POST /api/1.0/suggestions/list
 
 import json
 import sys
+import time
 import requests
 import splunk.entity as entity
-from typing import Any, Dict, List, Optional
-
+from typing import Dict, Any
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
@@ -21,8 +18,8 @@ CONF_STANZA = "settings"
 API_URL = "https://asm.cloud.tenable.com/api/1.0/suggestions/list"
 
 
-def emit(obj: Any) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+def emit(event: Dict[str, Any]) -> None:
+    print(json.dumps(event, ensure_ascii=False))
 
 
 def load_settings() -> Dict[str, Any]:
@@ -35,8 +32,8 @@ def load_settings() -> Dict[str, Any]:
 
 
 def get_str(cfg: Dict[str, Any], key: str, default: str = "") -> str:
-    v = cfg.get(key)
-    return str(v).strip() if v is not None else default
+    val = cfg.get(key)
+    return str(val).strip() if val is not None else default
 
 
 def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
@@ -44,32 +41,6 @@ def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
         return int(cfg.get(key, default))
     except Exception:
         return default
-
-
-def fetch_suggestions(
-    session: requests.Session,
-    headers: Dict[str, str],
-    timeout: int,
-    is_archived: bool,
-) -> List[Dict[str, Any]]:
-    """
-    Returns the API's suggestions list for one archived mode.
-    Expected response:
-      { "suggestions": [ { ... } ], "total": 0 }
-    """
-    url = f"{API_URL}?is_archived={'true' if is_archived else 'false'}"
-
-    # API example shows POST (no required body)
-    resp = session.post(url, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-
-    payload = resp.json()
-    suggestions = payload.get("suggestions", None)
-
-    if not isinstance(suggestions, list):
-        raise RuntimeError("Unexpected response shape: 'suggestions' list not found")
-
-    return suggestions
 
 
 def main() -> None:
@@ -86,31 +57,53 @@ def main() -> None:
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
-            "Authorization": api_key,
+            "Authorization": api_key
         }
 
         session = requests.Session()
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        # 1) Active suggestions (is_archived=false)
-        active = fetch_suggestions(session, headers, timeout, is_archived=False)
-        for s in active:
-            if isinstance(s, dict):
-                out = dict(s)               # keep all returned suggestion fields
-                out["is_archived"] = False  # add request context only
-                emit(out)
+        payload = {
+            "is_archived": True
+        }
 
-        # 2) Archived suggestions (is_archived=true)
-        archived = fetch_suggestions(session, headers, timeout, is_archived=True)
-        for s in archived:
-            if isinstance(s, dict):
-                out = dict(s)
-                out["is_archived"] = True
-                emit(out)
+        resp = session.post(API_URL, headers=headers, json=payload, timeout=timeout)
+        resp.raise_for_status()
+
+        data = resp.json()
+        suggestions = data.get("suggestions", [])
+
+        retrieved_at = int(time.time())
+
+        for s in suggestions:
+            base_event = {
+                "event_type": "asm_suggestion",
+                "suggestion_id": s.get("id"),
+                "suggestion_text": s.get("suggestion_text"),
+                "suggestion_type": s.get("suggestion_type"),
+                "created_at": s.get("created_at"),
+                "deleted_at": s.get("deleted_at"),
+                "retrieved_at": retrieved_at
+            }
+
+            rules = s.get("suggestion_details", {}).get("rules", [])
+            if rules:
+                for r in rules:
+                    emit({
+                        **base_event,
+                        "rule": r.get("rule"),
+                        "rule_description": r.get("description")
+                    })
+            else:
+                emit(base_event)
 
     except Exception as exc:
-        emit({"error": str(exc)})
+        emit({
+            "event_type": "asm_suggestion_error",
+            "error": str(exc),
+            "ts": int(time.time())
+        })
         sys.exit(1)
 
 
