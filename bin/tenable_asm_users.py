@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # bin/tenable_asm_users.py
 #
-# Tenable Attack Surface Management – Users
+# Tenable Attack Surface Management – Admin Users
 # Endpoint: GET /api/1.0/admin/users
 #
-# Emits one JSON event per user (Splunk scripted input compatible)
+# Emits one event per user
 
 import json
 import sys
 import time
 import requests
 import splunk.entity as entity
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
@@ -66,14 +66,20 @@ def main() -> None:
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        resp = session.get(BASE_URL, headers=headers, timeout=timeout)
+        resp = session.get(
+            BASE_URL,
+            headers=headers,
+            timeout=timeout
+        )
         resp.raise_for_status()
 
         payload = resp.json()
-        users: List[Dict[str, Any]] = payload.get("list", [])
+        users = payload.get("list", [])
+
+        now = int(time.time())
 
         for user in users:
-            event = {
+            emit({
                 "event_type": "asm_user",
                 "id": user.get("id"),
                 "email": user.get("email"),
@@ -91,13 +97,12 @@ def main() -> None:
                     for c in user.get("companies", [])
                     if c.get("name")
                 ],
-            }
-
-            emit(event)
+                "retrieved_at": now
+            })
 
     except Exception as exc:
         emit({
-            "event_type": "asm_users_error",
+            "event_type": "asm_user_error",
             "error": str(exc),
             "ts": int(time.time())
         })
@@ -105,4 +110,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main() 
