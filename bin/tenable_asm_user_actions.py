@@ -1,33 +1,32 @@
 #!/usr/bin/env python3
 # bin/tenable_asm_user_actions.py
 #
-# Tenable ASM -> User Action Logs
-# Endpoint: GET https://asm.cloud.tenable.com/api/1.0/user-action-logs
-# Response shape (per Tenable): { "list": [...], "total": <int> }
+# Tenable Attack Surface Management – User Action Logs
+# Endpoint: GET /api/1.0/logs
 #
-# Output: 1 JSON event per line to stdout (Splunk scripted input friendly)
+# Emits one JSON event per action
 
 import json
 import sys
 import time
-from typing import Any, Dict, List, Optional
-
 import requests
 import splunk.entity as entity
+from typing import Dict, Any, List
 
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
 CONF_STANZA = "settings"
 
-BASE_URL = "https://asm.cloud.tenable.com/api/1.0/user-action-logs"
+BASE_URL = "https://asm.cloud.tenable.com/api/1.0/logs"
+PAGE_SIZE = 100
 
 
-def _emit(obj: Dict[str, Any]) -> None:
-    print(json.dumps(obj, ensure_ascii=False))
+def emit(event: Dict[str, Any]) -> None:
+    print(json.dumps(event, ensure_ascii=False))
 
 
-def _load_settings() -> Dict[str, Any]:
+def load_settings() -> Dict[str, Any]:
     return entity.getEntity(
         f"configs/conf-{CONF_FILE}",
         CONF_STANZA,
@@ -36,80 +35,84 @@ def _load_settings() -> Dict[str, Any]:
     )
 
 
-def _get_int(settings: Dict[str, Any], key: str, default: int) -> int:
+def get_str(cfg: Dict[str, Any], key: str, default: str = "") -> str:
+    val = cfg.get(key)
+    return str(val).strip() if val is not None else default
+
+
+def get_int(cfg: Dict[str, Any], key: str, default: int) -> int:
     try:
-        v = str(settings.get(key, "")).strip()
-        return int(v) if v else default
+        return int(cfg.get(key, default))
     except Exception:
         return default
 
 
-def _get_str(settings: Dict[str, Any], key: str, default: str = "") -> str:
-    v = settings.get(key)
-    return str(v).strip() if v is not None else default
-
-
 def main() -> None:
     try:
-        settings = _load_settings()
-        api_key = _get_str(settings, "api_key")
+        cfg = load_settings()
+
+        api_key = get_str(cfg, "api_key")
         if not api_key:
-            raise RuntimeError("Missing api_key in local/asm_settings.conf [settings]")
+            raise RuntimeError("Missing api_key in asm_settings.conf")
 
-        proxy = _get_str(settings, "proxy")
-        timeout = _get_int(settings, "timeout_seconds", 60)
-
-        # paging controls (can be overridden later via asm_settings.conf if you want)
-        limit = _get_int(settings, "user_action_limit", 200)
-        if limit <= 0:
-            limit = 200
-        # don’t assume Tenable max; cap to something sane
-        if limit > 500:
-            limit = 500
+        proxy = get_str(cfg, "proxy")
+        timeout = get_int(cfg, "timeout_seconds", 60)
 
         headers = {
             "accept": "application/json",
-            "Authorization": api_key,  # EXACT: matches your working ASM scripts
+            "Authorization": api_key
         }
 
-        sess = requests.Session()
+        session = requests.Session()
         if proxy:
-            sess.proxies.update({"http": proxy, "https": proxy})
+            session.proxies.update({"http": proxy, "https": proxy})
 
         offset = 0
-        total_seen = 0
 
         while True:
-            params = {"offset": offset, "limit": limit}
-            resp = sess.get(BASE_URL, headers=headers, params=params, timeout=timeout)
+            params = {
+                "limit": PAGE_SIZE,
+                "offset": offset
+            }
+
+            resp = session.get(
+                BASE_URL,
+                headers=headers,
+                params=params,
+                timeout=timeout
+            )
             resp.raise_for_status()
 
             payload = resp.json()
-            events: List[Dict[str, Any]] = payload.get("list", []) or []
-            total = payload.get("total", None)
+            events: List[Dict[str, Any]] = payload.get("list", [])
 
-            for ev in events:
-                _emit(ev)
-            total_seen += len(events)
-
-            # stop conditions
             if not events:
                 break
-            if len(events) < limit:
-                break
-            if isinstance(total, int) and total_seen >= total:
+
+            for ev in events:
+                emit({
+                    "event_type": "asm_user_action",
+                    "id": ev.get("id"),
+                    "action": ev.get("action"),
+                    "target": ev.get("target"),
+                    "actor": ev.get("actor"),
+                    "actor_id": ev.get("actor_id"),
+                    "inventory_id": ev.get("inventory_id"),
+                    "description_values": ev.get("description_values"),
+                    "created_at": ev.get("created_at")
+                })
+
+            if len(events) < PAGE_SIZE:
                 break
 
-            offset += len(events)
+            offset += PAGE_SIZE
 
-    except Exception as e:
-        _emit(
-            {
-                "event_type": "tenable_asm_user_action_logs_error",
-                "error": str(e),
-                "ts": int(time.time()),
-            }
-        )
+    except Exception as exc:
+        emit({
+            "event_type": "asm_user_actions_error",
+            "error": str(exc),
+            "ts": int(time.time())
+        })
         sys.exit(1)
 
 
