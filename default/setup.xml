@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form>
+  <label>Tenable Attack Surface Management for Splunk – Setup</label>
+  <description>
+    Configure access to the Tenable Attack Surface Management (ASM) API.
+    Enter an API key, optional proxy settings, and select which ASM data
+    sources should be enabled for ingestion.
+  </description>
+
+  <!-- ========================= -->
+  <!-- AUTHENTICATION -->
+  <!-- ========================= -->
+  <fieldset submitButton="true">
+    <legend>Authentication</legend>
+
+    <input type="password" token="asm_api_key">
+      <label>ASM API Key</label>
+      <help>
+        Enter your Tenable Attack Surface Management API key.
+      </help>
+    </input>
+  </fieldset>
+
+  <!-- ========================= -->
+  <!-- PROXY CONFIGURATION -->
+  <!-- ========================= -->
+  <fieldset>
+    <legend>Proxy Configuration (Optional)</legend>
+
+    <input type="text" token="proxy_host">
+      <label>Proxy Host</label>
+      <help>Proxy hostname or IP address.</help>
+    </input>
+
+    <input type="text" token="proxy_port">
+      <label>Proxy Port</label>
+      <help>Proxy port (for example: 8080).</help>
+    </input>
+
+    <input type="text" token="proxy_username">
+      <label>Proxy Username</label>
+      <help>Optional proxy authentication username.</help>
+    </input>
+
+    <input type="password" token="proxy_password">
+      <label>Proxy Password</label>
+      <help>Optional proxy authentication password.</help>
+    </input>
+  </fieldset>
+
+  <!-- ========================= -->
+  <!-- DATA SOURCE SELECTION -->
+  <!-- ========================= -->
+  <fieldset>
+    <legend>Enable ASM Data Sources</legend>
+
+    <input type="checkbox" token="enable_assets">
+      <choice value="1">Assets</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_inventory">
+      <choice value="1">Inventories</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_suggestions">
+      <choice value="1">Suggestions</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_sources">
+      <choice value="1">Sources</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_subscriptions">
+      <choice value="1">Subscriptions</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_alerts">
+      <choice value="1">Alerts</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_user_activity">
+      <choice value="1">User Activity Logs</choice>
+      <default>1</default>
+    </input>
+
+    <input type="checkbox" token="enable_txt_records">
+      <choice value="1">TXT Records</choice>
+      <default>1</default>
+    </input>
+
+  </fieldset>
+</form>
