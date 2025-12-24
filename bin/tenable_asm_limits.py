@@ -2,9 +2,7 @@
 # bin/tenable_asm_limits.py
 #
 # Tenable Attack Surface Management – Asset Limits
-# Endpoint: GET /api/1.0/asset-limit
-#
-# Emits a single event representing current ASM limits state
+# Endpoint: GET /api/1.0/assets/limit
 
 import json
 import sys
@@ -13,12 +11,11 @@ import requests
 import splunk.entity as entity
 from typing import Dict, Any
 
-
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
 CONF_FILE = "asm_settings"
 CONF_STANZA = "settings"
 
-BASE_URL = "https://asm.cloud.tenable.com/api/1.0/asset-limit"
+API_URL = "https://asm.cloud.tenable.com/api/1.0/assets/limit"
 
 
 def emit(event: Dict[str, Any]) -> None:
@@ -66,26 +63,21 @@ def main() -> None:
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
 
-        resp = session.get(
-            BASE_URL,
-            headers=headers,
-            timeout=timeout
-        )
+        resp = session.get(API_URL, headers=headers, timeout=timeout)
         resp.raise_for_status()
 
-        data = resp.json()
+        payload = resp.json()
         now = int(time.time())
 
         emit({
-            "event_type": "asm_asset_limit",
-            "asset_limit": data.get("asset_limit"),
-            "limit_reached": data.get("limit_reached"),
-            "retrieved_at": now
+            "event_type": "asm_limits",
+            "retrieved_at": now,
+            **payload
         })
 
     except Exception as exc:
         emit({
-            "event_type": "asm_asset_limit_error",
+            "event_type": "asm_limits_error",
             "error": str(exc),
             "ts": int(time.time())
         })
