@@ -1,1 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nav search_view="search" color="#2c3e50">
 
+  <collection label="Tenable Attack Surface Management">
+
+    <!-- Executive / High-Level -->
+    <view name="asm_overview" label="Overview" />
+    <view name="asm_inventory_overview" label="Inventory Summary" />
+    <view name="asm_attack_surface" label="Attack Surface Metrics" />
+
+    <!-- Core ASM Objects -->
+    <view name="asm_assets" label="Assets" />
+    <view name="asm_inventories" label="Inventories" />
+    <view name="asm_suggestions" label="Suggestions" />
+    <view name="asm_suggestion_counts" label="Suggestion Counts" />
+    <view name="asm_txt_records" label="TXT Records" />
+
+    <!-- Identity & Activity -->
+    <view name="asm_users" label="Users" />
+    <view name="asm_user_actions" label="User Action Logs" />
+    <view name="asm_roles_permissions" label="Roles & Permissions" />
+
+    <!-- Limits & Governance -->
+    <view name="asm_limits" label="Asset Limits" />
+    <view name="asm_subscriptions" label="Subscriptions" />
+
+    <!-- Operations -->
+    <view name="asm_operations" label="Operations" />
+    <view name="asm_ingest_health" label="Ingest Health" />
+    <view name="asm_errors" label="Errors & Failures" />
+
+    <!-- Administration -->
+    <collection label="Administration">
+      <view name="setup" label="Setup" />
+      <view name="asm_configuration" label="Configuration" />
+      <view name="asm_diagnostics" label="Diagnostics" />
+    </collection>
+
+  </collection>
+
+</nav>
