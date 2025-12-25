@@ -1,152 +1,131 @@
 <dashboard version="1.1">
-  <label>Tenable ASM – Suggestions</label>
+  <label>Tenable ASM – Subscriptions</label>
   <description>
-    Visibility into Tenable Attack Surface Management suggestions, types, and rule complexity.
+    Smart Folders (Subscriptions): counts, asset coverage, filter complexity, and detailed listing.
   </description>
 
   <!-- ========================= -->
-  <!-- Suggestion Counts -->
-  <!-- ========================= -->
-  <row>
-
-    <panel>
-      <title>Total Suggestions</title>
-      <single>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | stats dc(id) as total
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </single>
-    </panel>
-
-    <panel>
-      <title>Active Suggestions</title>
-      <single>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval deleted_at=coalesce(deleted_at,"")
-            | where deleted_at=""
-            | stats dc(id) as active
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </single>
-    </panel>
-
-    <panel>
-      <title>Archived Suggestions</title>
-      <single>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval deleted_at=coalesce(deleted_at,"")
-            | where deleted_at!=""
-            | stats dc(id) as archived
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </single>
-    </panel>
-
-  </row>
-
-  <!-- ========================= -->
-  <!-- Suggestion Type Distribution -->
+  <!-- Key Counts -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Suggestions by Type</title>
-      <chart>
+      <title>Total Subscriptions</title>
+      <single>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval suggestion_type=coalesce(suggestion_type,"unknown")
-            | stats count as count by suggestion_type
-            | sort - count
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | stats dc(id) as total_subscriptions
           </query>
         </search>
-        <option name="charting.chart">bar</option>
-        <option name="charting.axisTitleX.text">Suggestion Type</option>
-        <option name="charting.axisTitleY.text">Count</option>
         <option name="drilldown">none</option>
-      </chart>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total Assets Covered</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | stats sum(current_asset_count) as total_assets_covered
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Subscriptions With Filters</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | eval has_filters=if(isnull(filters_normalized) OR trim(filters_normalized)="", 0, 1)
+            | stats sum(has_filters) as subscriptions_with_filters
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
     </panel>
   </row>
 
   <!-- ========================= -->
-  <!-- Rules per Suggestion Distribution -->
+  <!-- Distributions -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Rules per Suggestion (Distribution)</title>
+      <title>Subscriptions by Asset Count</title>
       <chart>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | spath path=suggestion_details.rules{} output=rules_mv
-            | eval rule_count=mvcount(rules_mv)
-            | stats count as suggestions by rule_count
-            | sort 0 + rule_count
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | eval asset_bucket=case(
+                current_asset_count>=10000,"10k+",
+                current_asset_count>=5000,"5k–9,999",
+                current_asset_count>=1000,"1k–4,999",
+                current_asset_count>=100,"100–999",
+                current_asset_count>=1,"1–99",
+                1=1,"0"
+              )
+            | stats count as subscriptions by asset_bucket
+            | sort 0 asset_bucket
           </query>
         </search>
         <option name="charting.chart">column</option>
-        <option name="charting.axisTitleX.text">Rule Count</option>
-        <option name="charting.axisTitleY.text">Suggestions</option>
+        <option name="charting.axisTitleX.text">Asset Count Bucket</option>
+        <option name="charting.axisTitleY.text">Subscriptions</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Filter Complexity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | eval f=trim(filters_normalized)
+            | eval filter_count=case(
+                isnull(f) OR f="", 0,
+                like(f,"% AND %"), mvcount(split(f," AND "))+1,
+                1=1, 1
+              )
+            | stats count as subscriptions by filter_count
+            | sort 0 filter_count
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Subscriptions</option>
+        <option name="charting.axisTitleY.text">Filter Count</option>
         <option name="drilldown">none</option>
       </chart>
     </panel>
   </row>
 
   <!-- ========================= -->
-  <!-- Rules Summary Stats -->
+  <!-- Subscription Details -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Rule Count Summary (Avg / Min / Max)</title>
+      <title>Subscription Details</title>
       <table>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | spath path=suggestion_details.rules{} output=rules_mv
-            | eval rule_count=mvcount(rules_mv)
-            | stats avg(rule_count) as avg_rules min(rule_count) as min_rules max(rule_count) as max_rules
-          </query>
-        </search>
-        <option name="wrap">true</option>
-        <option name="drilldown">none</option>
-        <option name="count">1</option>
-        <option name="export.menu">true</option>
-      </table>
-    </panel>
-  </row>
-
-  <!-- ========================= -->
-  <!-- Suggestion Details -->
-  <!-- ========================= -->
-  <row>
-    <panel>
-      <title>Suggestion Details</title>
-      <table>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval deleted_at=coalesce(deleted_at,"")
-            | eval status=if(deleted_at="","active","archived")
-            | spath path=suggestion_details.rules{} output=rules_mv
-            | eval rule_count=mvcount(rules_mv)
-            | eval rules_preview=mvjoin(rules_mv," | ")
-            | table id suggestion_type suggestion_text status created_at deleted_at rule_count rules_preview
-            | sort - created_at
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscriptions
+            | eval f=trim(filters_normalized)
+            | eval filter_count=case(
+                isnull(f) OR f="", 0,
+                like(f,"% AND %"), mvcount(split(f," AND "))+1,
+                1=1, 1
+              )
+            | table id name current_asset_count filter_count filters_normalized updated_at description
+            | sort - updated_at
           </query>
         </search>
         <option name="count">25</option>
         <option name="wrap">true</option>
         <option name="drilldown">none</option>
-        <option name="export.menu">true</option>
+        <option name="rowNumbers">false</option>
       </table>
     </panel>
   </row>
