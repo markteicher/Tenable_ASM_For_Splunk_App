@@ -1,0 +1,28 @@
+<row>
+  <panel>
+    <title>App Update Timestamps</title>
+    <table>
+      <search>
+        <query>
+index=$ASM_INDEX$ sourcetype=asm:assets
+| stats
+    latest('app_updates.domaininfo')  as domaininfo
+    latest('app_updates.ipgeo')       as ipgeo
+    latest('app_updates.own_body')    as own_body
+    latest('app_updates.own_header')  as own_header
+    latest('app_updates.ports')       as ports
+    latest('app_updates.rbls')        as rbls
+    latest('app_updates.screenshot')  as screenshot
+    latest('app_updates.ssl')         as ssl
+    latest('app_updates.wtech')       as wtech
+| transpose header_field=field column_name=component
+| rename "row 1" as last_update
+| sort component
+        </query>
+      </search>
+      <option name="count">20</option>
+      <option name="wrap">true</option>
+      <option name="drilldown">none</option>
+    </table>
+  </panel>
+</row>
