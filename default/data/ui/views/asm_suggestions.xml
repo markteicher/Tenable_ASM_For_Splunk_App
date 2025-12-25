@@ -1,1 +1,131 @@
+<dashboard version="1.1">
+  <label>Tenable Attack Surface Management – Suggestions</label>
+  <description>
+    Analysis of Tenable ASM suggestions, including type distribution, rule composition, and affected assets.
+  </description>
 
+  <!-- ========================= -->
+  <!-- High-Level Metrics -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Total Suggestions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Active Suggestions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | where isnull(deleted_at)
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Archived Suggestions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | where isnotnull(deleted_at)
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Suggestions by Type -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Suggestions by Type</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | stats count by suggestion_type
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Suggestions Over Time (Creation)</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | timechart span=1d count
+          </query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Suggestion Rules Breakdown -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Suggestion Rule Composition</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | mvexpand suggestion_details.rules
+            | eval rule=rule.rule, description=rule.description
+            | table id suggestion_type rule description
+            | sort suggestion_type
+          </query>
+        </search>
+        <option name="count">15</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Detailed Suggestions -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Suggestions Detail</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | table id suggestion_text suggestion_type created_at deleted_at
+            | sort - created_at
+          </query>
+        </search>
+        <option name="count">20</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
