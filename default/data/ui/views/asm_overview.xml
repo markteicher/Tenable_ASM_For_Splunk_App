@@ -20,7 +20,25 @@
         <option name="drilldown">none</option>
       </single>
     </panel>
-
+  <!-- ========================= -->
+  <!-- Assets by Severity -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Severity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count by bd.severity_ranking
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
     <panel>
       <title>Total Inventories</title>
       <single>
