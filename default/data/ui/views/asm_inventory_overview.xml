@@ -1,1 +1,141 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Inventory Overview</label>
+  <description>
+    High-level visibility into Tenable Attack Surface Management inventories, asset distribution, and inventory pressure.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Inventory KPIs -->
+  <!-- ========================= -->
+  <row>
+
+    <panel>
+      <title>Total Inventories</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | stats count as total_inventories
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total Assets (All Inventories)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | stats sum(current_asset_count) as total_assets
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Average Assets per Inventory</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | stats avg(current_asset_count) as avg_assets
+            | eval avg_assets=round(avg_assets,2)
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Empty Inventories</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | where current_asset_count=0
+            | stats count as empty_inventories
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+  </row>
+
+  <!-- ========================= -->
+  <!-- Inventory Size Distribution -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets per Inventory</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | stats latest(current_asset_count) as asset_count by inventory_name
+            | sort - asset_count
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Inventory</option>
+        <option name="charting.axisTitleY.text">Asset Count</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Inventory Pressure -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Source Suggestions per Inventory</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | stats latest(source_suggestions) as suggestion_count by inventory_name
+            | sort - suggestion_count
+          </query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.text">Inventory</option>
+        <option name="charting.axisTitleY.text">Suggestions</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Inventory Detail Table -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Inventory Details</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:inventories
+            | table
+                inventory_id
+                inventory_name
+                current_asset_count
+                users_total
+                source_suggestions
+                business_id
+                enumeration_wordlist
+                has_custom_wordlist
+            | sort - current_asset_count
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
