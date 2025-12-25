@@ -1,1 +1,54 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Users</label>
+  <description>
+    User inventory for Tenable Attack Surface Management.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Total Users -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Total Users</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:users
+            | stats dc(id) as total_users
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Users Detailed Listing -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Users</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:users
+            | table
+                id
+                email
+                access_level
+                workspace
+                business_id
+                created_at
+                first_login
+                user_inventories_limit
+            | sort email
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
