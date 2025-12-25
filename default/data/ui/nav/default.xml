@@ -3,10 +3,10 @@
 
   <collection label="Tenable Attack Surface Management">
 
-    <!-- Executive -->
-    <view name="asm_overview" label="Overview" />
-    <view name="asm_inventory_overview" label="Inventory Summary" />
-    <view name="asm_attack_surface" label="Attack Surface Metrics" />
+<!-- Executive -->
+<view name="asm_overview" label="Overview" />
+<view name="asm_inventory_overview" label="Inventory Summary" />
+<view name="asm_attack_surface" label="Attack Surface Metrics" />
 
     <!-- Attack Surface
     Management Data -->
