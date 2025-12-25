@@ -3,24 +3,25 @@
 
   <collection label="Tenable Attack Surface Management">
 
-    <!-- Executive / High-Level -->
+    <!-- Executive -->
     <view name="asm_overview" label="Overview" />
     <view name="asm_inventory_overview" label="Inventory Summary" />
     <view name="asm_attack_surface" label="Attack Surface Metrics" />
 
-    <!-- Core ASM Objects -->
+    <!-- Attack Surface
+    Management Data -->
     <view name="asm_assets" label="Assets" />
     <view name="asm_inventories" label="Inventories" />
     <view name="asm_suggestions" label="Suggestions" />
     <view name="asm_suggestion_counts" label="Suggestion Counts" />
     <view name="asm_txt_records" label="TXT Records" />
 
-    <!-- Identity & Activity -->
+    <!-- Users and Activity -->
     <view name="asm_users" label="Users" />
     <view name="asm_user_actions" label="User Action Logs" />
     <view name="asm_roles_permissions" label="Roles & Permissions" />
 
-    <!-- Limits & Governance -->
+    <!-- Attack Surface Management Limits -->
     <view name="asm_limits" label="Asset Limits" />
     <view name="asm_subscriptions" label="Subscriptions" />
 
