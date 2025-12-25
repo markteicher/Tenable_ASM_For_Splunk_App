@@ -1,1 +1,155 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Ingest Health</label>
+  <description>
+    Health and freshness monitoring for Tenable Attack Surface Management data ingestion into Splunk.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Ingest Health KPIs -->
+  <!-- ========================= -->
+  <row>
+
+    <panel>
+      <title>Events (Last 1 Hour)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-1h
+            | stats count as events_1h
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Events (Last 24 Hours)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-24h
+            | stats count as events_24h
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Distinct Sourcetypes</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats dc(sourcetype) as sourcetypes
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Last Event Seen</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats latest(_time) as last_event
+            | eval last_event=strftime(last_event, "%Y-%m-%d %H:%M:%S")
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Rate Over Time -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Ingest Rate (Last 24 Hours)</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-24h
+            | timechart span=15m count
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Events</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Sourcetype Freshness -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Sourcetype Freshness</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats latest(_time) as last_seen count by sourcetype
+            | eval age_minutes = round((now() - last_seen) / 60, 2)
+            | eval last_seen = strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+            | sort - age_minutes
+          </query>
+        </search>
+        <option name="wrap">false</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Potential Ingest Gaps -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Potential Ingest Gaps (Stale Data)</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats latest(_time) as last_seen by sourcetype
+            | eval age_hours = round((now() - last_seen) / 3600, 2)
+            | where age_hours &gt; 24
+            | eval last_seen = strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+            | sort - age_hours
+          </query>
+        </search>
+        <option name="wrap">false</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Errors -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Recent Ingest Errors</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | table _time sourcetype event_type error
+            | sort - _time
+            | head 50
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
