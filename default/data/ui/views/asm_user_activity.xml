@@ -1,59 +1,59 @@
 <dashboard version="1.1">
   <label>Tenable ASM – User Activity</label>
   <description>
-    User and system activity logs from Tenable Attack Surface Management, including actions, actors, and trends.
+    User, automation, and system activity within Tenable Attack Surface Management.
   </description>
 
   <!-- ========================= -->
   <!-- Filters -->
   <!-- ========================= -->
-  <fieldset submitButton="false">
+  <form>
 
     <input type="multiselect" token="actor_tok">
       <label>Actor</label>
       <choice value="*">All</choice>
-      <prefix>actor="</prefix>
-      <suffix>"</suffix>
       <search>
         <query>
           index=$ASM_INDEX$ sourcetype=asm:user_activity
           | stats count by actor
           | sort actor
+          | table actor
         </query>
       </search>
       <fieldForLabel>actor</fieldForLabel>
       <fieldForValue>actor</fieldForValue>
+      <delimiter>,</delimiter>
     </input>
 
     <input type="multiselect" token="email_tok">
       <label>Email</label>
       <choice value="*">All</choice>
-      <prefix>email="</prefix>
-      <suffix>"</suffix>
       <search>
         <query>
           index=$ASM_INDEX$ sourcetype=asm:user_activity
           | stats count by email
           | sort email
+          | table email
         </query>
       </search>
       <fieldForLabel>email</fieldForLabel>
       <fieldForValue>email</fieldForValue>
+      <delimiter>,</delimiter>
     </input>
 
-  </fieldset>
+  </form>
 
   <!-- ========================= -->
-  <!-- Summary Metrics -->
+  <!-- KPI -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Total Activity Records</title>
+      <title>Total Activity Events</title>
       <single>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | stats count
           </query>
         </search>
@@ -63,16 +63,16 @@
   </row>
 
   <!-- ========================= -->
-  <!-- Activity Trends -->
+  <!-- Time-Based Trends -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Weekly Activity by Action</title>
+      <title>Week over Week Activity</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | timechart span=1w count by action
           </query>
         </search>
@@ -84,12 +84,12 @@
 
   <row>
     <panel>
-      <title>Monthly Activity by Action</title>
+      <title>Month over Month Activity</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | timechart span=1mon count by action
           </query>
         </search>
@@ -101,12 +101,12 @@
 
   <row>
     <panel>
-      <title>Quarterly Activity by Action</title>
+      <title>Quarter over Quarter Activity</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | timechart span=1q count by action
           </query>
         </search>
@@ -118,12 +118,12 @@
 
   <row>
     <panel>
-      <title>Yearly Activity by Action</title>
+      <title>Year over Year Activity</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | timechart span=1y count by action
           </query>
         </search>
@@ -134,62 +134,35 @@
   </row>
 
   <!-- ========================= -->
-  <!-- Top Actors / Actions -->
+  <!-- Activity Details + Drilldown -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Top Actors</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
-            | stats count by actor
-            | sort -count
-            | head 10
-          </query>
-        </search>
-        <option name="charting.chart">bar</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-
-    <panel>
-      <title>Top Actions</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
-            | stats count by action
-            | sort -count
-            | head 10
-          </query>
-        </search>
-        <option name="charting.chart">pie</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-  </row>
-
-  <!-- ========================= -->
-  <!-- Activity Detail Table -->
-  <!-- ========================= -->
-  <row>
-    <panel>
-      <title>Activity Log Details</title>
+      <title>User Activity Details</title>
       <table>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:user_activity
-            | search $actor_tok$ $email_tok$
+            | search actor IN ($actor_tok$) email IN ($email_tok$)
             | table _time actor actor_id email action target inventory_id description
             | sort -_time
           </query>
         </search>
+
         <option name="count">25</option>
         <option name="wrap">true</option>
-        <option name="drilldown">none</option>
+        <option name="drilldown">row</option>
+
+        <drilldown>
+          <link>
+            <![CDATA[
+            /app/$app$/asm_users
+            ?form.actor=$row.actor$
+            &form.email=$row.email$
+            ]]>
+          </link>
+        </drilldown>
+
       </table>
     </panel>
   </row>
