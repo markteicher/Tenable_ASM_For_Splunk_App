@@ -2,7 +2,7 @@
   <block title="Tenable Attack Surface Management – Setup">
 
     <!-- ========================= -->
-    <!-- Connection Configuration -->
+    <!-- Authentication -->
     <!-- ========================= -->
 
     <input type="password">
@@ -11,9 +11,13 @@
       <help>Enter your Tenable Attack Surface Management API key.</help>
     </input>
 
+    <!-- ========================= -->
+    <!-- Target Index -->
+    <!-- ========================= -->
+
     <input type="text">
-      <label>Index Name</label>
-      <name>index</name>
+      <label>Target Index</label>
+      <name>asm_index</name>
       <default>security_tenable_asm</default>
       <help>Splunk index where ASM data will be stored.</help>
     </input>
@@ -24,10 +28,22 @@
 
     <block title="Proxy Configuration (Optional)">
 
+      <input type="checkbox">
+        <label>Enable Proxy</label>
+        <name>proxy_enabled</name>
+        <default>false</default>
+      </input>
+
+      <input type="text">
+        <label>Proxy Scheme</label>
+        <name>proxy_scheme</name>
+        <help>http or https</help>
+      </input>
+
       <input type="text">
         <label>Proxy Host</label>
         <name>proxy_host</name>
-        <help>Proxy hostname or IP (leave blank if not used).</help>
+        <help>Proxy hostname or IP.</help>
       </input>
 
       <input type="text">
@@ -50,7 +66,7 @@
 
       <button>
         <label>Test Proxy Connectivity</label>
-        <endpoint>/services/asm/proxy_test</endpoint>
+        <endpoint>/services/asm/proxy/test</endpoint>
       </button>
 
     </block>
@@ -61,54 +77,54 @@
 
     <button>
       <label>Test ASM API Authentication</label>
-      <endpoint>/services/asm/auth_test</endpoint>
+      <endpoint>/services/asm/auth/test</endpoint>
     </button>
 
     <!-- ========================= -->
-    <!-- ASM Component Selection -->
+    <!-- Component Selection -->
     <!-- ========================= -->
 
     <block title="ASM Components to Ingest">
 
       <input type="checkbox">
-        <label>Enable Asset Inventory</label>
+        <label>Assets</label>
         <name>enable_assets</name>
-        <default>true</default>
+        <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable Inventories</label>
+        <label>Inventories</label>
         <name>enable_inventories</name>
-        <default>true</default>
+        <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable Suggestions</label>
+        <label>Suggestions</label>
         <name>enable_suggestions</name>
-        <default>true</default>
+        <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable Alerts</label>
+        <label>Alerts</label>
         <name>enable_alerts</name>
-        <default>true</default>
+        <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable Subscriptions</label>
+        <label>Subscriptions</label>
         <name>enable_subscriptions</name>
-        <default>true</default>
+        <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable TXT Records</label>
+        <label>TXT Records</label>
         <name>enable_txt_records</name>
         <default>false</default>
       </input>
 
       <input type="checkbox">
-        <label>Enable Activity Logs</label>
-        <name>enable_logs</name>
+        <label>Activity Logs</label>
+        <name>enable_activity_logs</name>
         <default>false</default>
       </input>
 
@@ -120,7 +136,7 @@
 
     <button>
       <label>Save Configuration</label>
-      <endpoint>/services/asm/save</endpoint>
+      <endpoint>/services/asm/config/save</endpoint>
     </button>
 
   </block>
