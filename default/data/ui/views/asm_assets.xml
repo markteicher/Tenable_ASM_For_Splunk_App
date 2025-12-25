@@ -1,66 +1,29 @@
 <dashboard version="1.1">
   <label>Tenable ASM – Assets</label>
-  <description>
-    Asset inventory and exposure visibility for Tenable Attack Surface Management.
-  </description>
+  <description>Full asset inventory view with explicit field families and app enrichment timestamps.</description>
 
   <!-- ========================= -->
-  <!-- Asset Counts -->
+  <!-- Asset Summary -->
   <!-- ========================= -->
   <row>
     <panel>
       <title>Total Assets</title>
       <single>
         <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=asm:assets
-            | stats dc(id) as total_assets
-          </query>
+          <query>index=$ASM_INDEX$ sourcetype=asm:assets | stats count as total_assets</query>
         </search>
         <option name="drilldown">none</option>
       </single>
     </panel>
 
-    <panel>
-      <title>Domains</title>
-      <single>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=asm:assets
-            | where 'bd.record_type'="A" OR 'bd.record_type'="AAAA"
-            | stats count
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </single>
-    </panel>
-
-    <panel>
-      <title>IP Assets</title>
-      <single>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=asm:assets
-            | where isnotnull('bd.ip_address')
-            | stats count
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </single>
-    </panel>
-  </row>
-
-  <!-- ========================= -->
-  <!-- Assets by Severity -->
-  <!-- ========================= -->
-  <row>
     <panel>
       <title>Assets by Severity</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:assets
-            | stats count by bd.severity_ranking
+            | eval severity=coalesce('bd.severity_ranking',"unknown")
+            | stats count by severity
             | sort - count
           </query>
         </search>
@@ -68,56 +31,427 @@
         <option name="drilldown">none</option>
       </chart>
     </panel>
-  </row>
 
-  <!-- ========================= -->
-  <!-- Assets by Country -->
-  <!-- ========================= -->
-  <row>
     <panel>
-      <title>Assets by Country</title>
-      <chart>
+      <title>Hidden Assets</title>
+      <single>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:assets
-            | stats count by 'ipgeo.country'
-            | sort - count
-            | head 10
+            | stats sum(eval(if(hidden=true,1,0))) as hidden_assets
+            | eval hidden_assets=coalesce(hidden_assets,0)
+            | fields hidden_assets
           </query>
         </search>
-        <option name="charting.chart">bar</option>
-        <option name="charting.axisTitleX.text">Country</option>
-        <option name="charting.axisTitleY.text">Assets</option>
         <option name="drilldown">none</option>
-      </chart>
+      </single>
     </panel>
   </row>
 
   <!-- ========================= -->
-  <!-- Asset Details -->
+  <!-- App Update Timestamps (KEEP) -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Asset Inventory</title>
+      <title>App Update Timestamps</title>
       <table>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=asm:assets
-            | table
-                id
-                bd.domain
-                bd.hostname
-                bd.ip_address
-                bd.record_type
-                bd.severity_ranking
-                ipgeo.country
-                ports.verified_ports
-                'bd.last_metadata_change'
-            | sort - 'bd.last_metadata_change'
+            | spath
+            | eval
+                domaininfo  = 'app_updates.domaininfo',
+                ipgeo       = 'app_updates.ipgeo',
+                own_body    = 'app_updates.own_body',
+                own_header  = 'app_updates.own_header',
+                ports       = 'app_updates.ports',
+                rbls        = 'app_updates.rbls',
+                screenshot  = 'app_updates.screenshot',
+                ssl         = 'app_updates.ssl',
+                wtech       = 'app_updates.wtech'
+            | stats
+                latest(domaininfo)  as domaininfo
+                latest(ipgeo)       as ipgeo
+                latest(own_body)    as own_body
+                latest(own_header)  as own_header
+                latest(ports)       as ports
+                latest(rbls)        as rbls
+                latest(screenshot)  as screenshot
+                latest(ssl)         as ssl
+                latest(wtech)       as wtech
+            | eval
+                component_updates = mvappend(
+                  "domaininfo: " . domaininfo,
+                  "ipgeo: " . ipgeo,
+                  "own_body: " . own_body,
+                  "own_header: " . own_header,
+                  "ports: " . ports,
+                  "rbls: " . rbls,
+                  "screenshot: " . screenshot,
+                  "ssl: " . ssl,
+                  "wtech: " . wtech
+                )
+            | mvexpand component_updates
+            | rex field=component_updates "(?&lt;component&gt;[^:]+): (?&lt;last_update&gt;.*)"
+            | table component last_update
+            | sort component
           </query>
         </search>
-        <option name="count">25</option>
         <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Core + BD Fields -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Core / BD Fields</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | eval severity=coalesce('bd.severity_ranking',"")
+            | table
+                _time id hidden
+                'bd.last_metadata_change' severity
+                'bd.domain' 'bd.hostname' 'bd.original_hostname' 'bd.ip_address'
+                'bd.record_type' 'bd.record_value' 'bd.subdomain'
+                'bd.addedtoportfolio' 'bd.sources' 'bd.tags'
+                'bd.tenable_nessus_findings' 'bd.tenable_was_findings'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">20</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- DomainInfo -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>DomainInfo</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'domaininfo.registrarname' 'domaininfo.status' 'domaininfo.expiresdate'
+                'domaininfo.contactemail'
+                'domaininfo.fdns_nameservers'
+                'domaininfo.registrant_name' 'domaininfo.registrant_organization'
+                'domaininfo.registrant_email' 'domaininfo.registrant_telephone'
+                'domaininfo.registrant_city' 'domaininfo.registrant_state'
+                'domaininfo.registrant_country' 'domaininfo.registrant_postalcode'
+                'domaininfo.registrant_street1' 'domaininfo.registrant_street2'
+                'domaininfo.registrant_street3' 'domaininfo.registrant_street4'
+                'domaininfo.administrativecontact_name' 'domaininfo.administrativecontact_organization'
+                'domaininfo.administrativecontact_email' 'domaininfo.administrativecontact_telephone'
+                'domaininfo.technicalcontact_name' 'domaininfo.technicalcontact_organization'
+                'domaininfo.technicalcontact_email'
+                'domaininfo.billingcontact_email'
+                'domaininfo.zonecontact_email'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- IPGeo -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>IPGeo</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'ipgeo.asn' 'ipgeo.asn_number'
+                'ipgeo.cloud' 'ipgeo.cloudhosted'
+                'ipgeo.continent' 'ipgeo.country' 'ipgeo.registered_country'
+                'ipgeo.city' 'ipgeo.subdivisions'
+                'ipgeo.latitude' 'ipgeo.longitude'
+                'ipgeo.time_zone' 'ipgeo.insideeu'
+                'ipgeo.postal'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Own Body -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Own Body</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'own_body.contentlength'
+                'own_body.canonical'
+                'own_body.html'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Own Header -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Own Header</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'own_header.responsecode'
+                'own_header.server'
+                'own_header.content-type'
+                'own_header.content-language'
+                'own_header.vary'
+                'own_header.setsCookies'
+                'own_header.names'
+                'own_header.values'
+                'own_header.secnames'
+                'own_header.secvalues'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ports -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Ports</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'ports.ports' 'ports.verified_ports' 'ports.lastseen'
+                'ports.services'
+                'ports.cpes'
+                'ports.cves'
+                'ports.cvss3_scores'
+                'ports.cvss3_vectors'
+                'ports.banners'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- RBLs -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>RBLs</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table id 'rbls.rbls' 'rbls.sampledate'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">20</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Screenshot -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Screenshot</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'screenshot.finalurl'
+                'screenshot.final_response_code'
+                'screenshot.redirect_chain'
+                'screenshot.screenshot'
+                'screenshot.finalhtml'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- SSL -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>SSL</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'ssl.protocol'
+                'ssl.bits'
+                'ssl.ev_cert'
+                'ssl.jarm'
+                'ssl.fingerprint'
+                'ssl.serial_number'
+                'ssl.valid_from' 'ssl.valid_to'
+                'ssl.subjectaltname'
+                'ssl.issuer_C' 'ssl.issuer_O' 'ssl.issuer_CN'
+                'ssl.available_suites'
+                'ssl.sslerror'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- WTech -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>WTech (Technology Fingerprints)</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table
+                id
+                'wtech.has_login'
+                'wtech.document_title'
+                'wtech.socialurls'
+                'wtech.gakeys'
+                'wtech.adsensekeys'
+                'wtech.mixedcontent'
+                'wtech.Operating Systems'
+                'wtech.Web Servers'
+                'wtech.Web Frameworks'
+                'wtech.JavaScript Frameworks'
+                'wtech.JavaScript Libraries'
+                'wtech.Content Management Systems'
+                'wtech.Databases'
+                'wtech.Content Delivery Networks'
+                'wtech.Payment Processors'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- WPScan -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>WPScan</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | table id 'wpscan.wpversion' 'wpscan.plugins' 'wpscan.vulnerabilities'
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">20</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Raw Backstop: Literally everything -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Raw All Fields (table *)</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | spath
+            | sort - _time
+            | table *
+          </query>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">false</option>
+        <option name="rowNumbers">true</option>
         <option name="drilldown">none</option>
       </table>
     </panel>
