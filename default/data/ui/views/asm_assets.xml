@@ -1,0 +1,126 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Assets</label>
+  <description>
+    Asset inventory and exposure visibility for Tenable Attack Surface Management.
+  </description>
+
+  <!-- ========================= -->
+  <!-- Asset Counts -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Total Assets</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | stats dc(id) as total_assets
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Domains</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where 'bd.record_type'="A" OR 'bd.record_type'="AAAA"
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>IP Assets</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where isnotnull('bd.ip_address')
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Assets by Severity -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Severity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | stats count by bd.severity_ranking
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Assets by Country -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Country</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | stats count by 'ipgeo.country'
+            | sort - count
+            | head 10
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Country</option>
+        <option name="charting.axisTitleY.text">Assets</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Asset Details -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Asset Inventory</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | table
+                id
+                bd.domain
+                bd.hostname
+                bd.ip_address
+                bd.record_type
+                bd.severity_ranking
+                ipgeo.country
+                ports.verified_ports
+                'bd.last_metadata_change'
+            | sort - 'bd.last_metadata_change'
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
