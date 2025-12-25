@@ -1,73 +1,62 @@
 <dashboard version="1.1">
-  <label>Tenable Attack Surface Management – Attack Surface Metrics</label>
+  <label>Tenable ASM – Attack Surface Metrics</label>
   <description>
-    Breakdown of the discovered attack surface by asset type, severity, geography, and exposure characteristics.
+    Attack surface breakdown and criticality/severity visibility for Tenable Attack Surface Management data in Splunk.
   </description>
 
   <!-- ========================= -->
-  <!-- Asset Composition -->
+  <!-- Key Attack Surface KPIs -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Assets by Record Type</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | stats count by bd.record_type
-            | sort - count
-          </query>
-        </search>
-        <option name="charting.chart">pie</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-
-    <panel>
-      <title>Assets by Severity</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | stats count by bd.severity_ranking
-            | sort - count
-          </query>
-        </search>
-        <option name="charting.chart">column</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-  </row>
-
-  <!-- ========================= -->
-  <!-- Exposure Characteristics -->
-  <!-- ========================= -->
-  <row>
-    <panel>
-      <title>Exposed Assets by Open Port</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | mvexpand ports.ports
-            | stats count by ports.ports
-            | sort - count
-            | head 10
-          </query>
-        </search>
-        <option name="charting.chart">bar</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-
-    <panel>
-      <title>Assets with SSL Errors</title>
+      <title>Total Assets</title>
       <single>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | where isnotnull(ssl.sslerror)
-            | stats count
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | stats count as total_assets
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total Domains</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where isnotnull('bd.domain') AND 'bd.domain'!=""
+            | stats dc('bd.domain') as total_domains
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total Hostnames</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where isnotnull('bd.hostname') AND 'bd.hostname'!=""
+            | stats dc('bd.hostname') as total_hostnames
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total IPs</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where isnotnull('bd.ip_address') AND 'bd.ip_address'!=""
+            | stats dc('bd.ip_address') as total_ips
           </query>
         </search>
         <option name="drilldown">none</option>
@@ -76,34 +65,48 @@
   </row>
 
   <!-- ========================= -->
-  <!-- Geographic Distribution -->
+  <!-- Total Attack Surface Assets by Type -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Assets by Country</title>
+      <title>Total Attack Surface Assets by Type</title>
       <chart>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | stats count by ipgeo.country
-            | sort - count
-            | head 10
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval asset_type=case(
+                isnotnull('bd.ip_address') AND 'bd.ip_address'!="", "ip",
+                isnotnull('bd.hostname') AND 'bd.hostname'!="", "hostname",
+                isnotnull('bd.domain') AND 'bd.domain'!="", "domain",
+                true(), "other"
+              )
+            | stats count as assets by asset_type
+            | sort -assets
           </query>
         </search>
         <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Asset Type</option>
+        <option name="charting.axisTitleY.text">Count</option>
         <option name="drilldown">none</option>
       </chart>
     </panel>
 
     <panel>
-      <title>Cloud-Hosted Assets</title>
+      <title>Percentage of Total Assets by Type</title>
       <chart>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | where ipgeo.cloudhosted=true
-            | stats count by ipgeo.cloud
-            | sort - count
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval asset_type=case(
+                isnotnull('bd.ip_address') AND 'bd.ip_address'!="", "ip",
+                isnotnull('bd.hostname') AND 'bd.hostname'!="", "hostname",
+                isnotnull('bd.domain') AND 'bd.domain'!="", "domain",
+                true(), "other"
+              )
+            | stats count as assets by asset_type
+            | eventstats sum(assets) as total
+            | eval pct=round((assets/total)*100,2)
+            | sort -assets
           </query>
         </search>
         <option name="charting.chart">pie</option>
@@ -113,22 +116,137 @@
   </row>
 
   <!-- ========================= -->
-  <!-- High-Risk Surface -->
+  <!-- Attack Surface by Criticality / Severity -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Critical & High Severity Assets</title>
+      <title>Attack Surface by Criticality / Severity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval severity=coalesce('bd.severity_ranking',"none")
+            | stats count as affected_assets by severity
+            | sort -affected_assets
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Severity</option>
+        <option name="charting.axisTitleY.text">Assets</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Note: Current Total Assets excludes severity_ranking=None</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | where isnotnull('bd.severity_ranking') AND 'bd.severity_ranking'!="None"
+            | stats count as current_total_assets
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Severity Ranking over Time -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Severity Ranking over Time</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval severity=coalesce('bd.severity_ranking',"none")
+            | timechart span=1d count by severity
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleX.text">Date</option>
+        <option name="charting.axisTitleY.text">Assets</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Assets by Country -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Country</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval country=coalesce('ipgeo.country','domaininfo.registrant_country',"unknown")
+            | stats count as assets by country
+            | sort -assets
+            | head 25
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Country</option>
+        <option name="charting.axisTitleY.text">Assets</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Hosted Web Servers -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Hosted Web Servers</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval server=coalesce('own_header.server',"unknown")
+            | stats count as assets by server
+            | sort -assets
+            | head 20
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Web Server</option>
+        <option name="charting.axisTitleY.text">Assets</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Drilldown Helper Table -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Attack Surface Asset Listing (Filtered)</title>
       <table>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | where bd.severity_ranking IN ("critical","high")
-            | table bd.hostname bd.ip_address bd.record_type bd.severity_ranking ipgeo.country ports.ports ssl.sslerror
-            | sort bd.severity_ranking
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | eval asset_type=case(
+                isnotnull('bd.ip_address') AND 'bd.ip_address'!="", "ip",
+                isnotnull('bd.hostname') AND 'bd.hostname'!="", "hostname",
+                isnotnull('bd.domain') AND 'bd.domain'!="", "domain",
+                true(), "other"
+              )
+            | eval severity=coalesce('bd.severity_ranking',"none")
+            | eval country=coalesce('ipgeo.country','domaininfo.registrant_country',"unknown")
+            | table id asset_type severity 'bd.domain' 'bd.hostname' 'bd.ip_address' country 'own_header.server' 'bd.last_metadata_change'
+            | sort -'bd.last_metadata_change'
           </query>
         </search>
-        <option name="count">15</option>
+        <option name="count">25</option>
         <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
         <option name="drilldown">none</option>
       </table>
     </panel>
