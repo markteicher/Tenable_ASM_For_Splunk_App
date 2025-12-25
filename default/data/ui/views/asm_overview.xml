@@ -20,25 +20,7 @@
         <option name="drilldown">none</option>
       </single>
     </panel>
-  <!-- ========================= -->
-  <!-- Assets by Severity -->
-  <!-- ========================= -->
-  <row>
-    <panel>
-      <title>Assets by Severity</title>
-      <chart>
-        <search>
-          <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
-            | stats count by bd.severity_ranking
-            | sort - count
-          </query>
-        </search>
-        <option name="charting.chart">pie</option>
-        <option name="drilldown">none</option>
-      </chart>
-    </panel>
-  </row>
+
     <panel>
       <title>Total Inventories</title>
       <single>
@@ -64,6 +46,48 @@
         </search>
         <option name="drilldown">none</option>
       </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Assets by Severity -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Severity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count by bd.severity_ranking
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Severity Trend (Ingest-Based) -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Severity Trend</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | eval ingest_day=strftime(_time,"%Y-%m-%d")
+            | stats count by ingest_day bd.severity_ranking
+            | sort ingest_day
+          </query>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.stackMode">stacked</option>
+        <option name="drilldown">none</option>
+      </chart>
     </panel>
   </row>
 
