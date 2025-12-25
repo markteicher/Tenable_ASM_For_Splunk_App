@@ -1,1 +1,121 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Configuration</label>
+  <description>
+    Read-only visibility into the active configuration for the Tenable Attack Surface Management for Splunk App.
+    Configuration values are set via the Setup page and REST handlers.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Core Configuration -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Core Settings</title>
+      <table>
+        <search>
+          <query>
+            | rest /servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/configs/conf-asm_settings/settings
+            | eval api_key=if(len(api_key)&gt;0,"(configured)","(missing)")
+            | eval proxy=if(len(proxy)&gt;0,proxy,"(none)")
+            | eval asm_index=if(len(asm_index)&gt;0,asm_index,"(missing)")
+            | fields api_key asm_index proxy timeout_seconds verify_tls
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Proxy Configuration -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Proxy Configuration</title>
+      <table>
+        <search>
+          <query>
+            | rest /servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/configs/conf-asm_settings/settings
+            | eval proxy_enabled=if(len(proxy)&gt;0,"yes","no")
+            | table proxy_enabled proxy verify_tls timeout_seconds
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Enabled ASM Components -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Enabled ASM Components</title>
+      <table>
+        <search>
+          <query>
+            | rest /servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/configs/conf-asm_settings/settings
+            | eval assets=if(enable_assets="1","enabled","disabled")
+            | eval inventories=if(enable_inventories="1","enabled","disabled")
+            | eval suggestions=if(enable_suggestions="1","enabled","disabled")
+            | eval suggestion_counts=if(enable_suggestion_counts="1","enabled","disabled")
+            | eval txt_records=if(enable_txt_records="1","enabled","disabled")
+            | eval users=if(enable_users="1","enabled","disabled")
+            | eval user_actions=if(enable_user_actions="1","enabled","disabled")
+            | eval limits=if(enable_limits="1","enabled","disabled")
+            | eval subscriptions=if(enable_subscriptions="1","enabled","disabled")
+            | table assets inventories suggestions suggestion_counts txt_records users user_actions limits subscriptions
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Input Intervals -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Configured Input Intervals</title>
+      <table>
+        <search>
+          <query>
+            | rest /servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/data/inputs/script
+            | where like(name,"%tenable_asm_%")
+            | eval interval=if(interval="","(adhoc)",interval)
+            | table name interval disabled
+            | sort name
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Index Validation -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Index Validation</title>
+      <table>
+        <search>
+          <query>
+            | rest /services/data/indexes
+            | fields title totalEventCount currentDBSizeMB frozenTimePeriodInSecs
+            | rename title as index
+            | search index=$ASM_INDEX$
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
