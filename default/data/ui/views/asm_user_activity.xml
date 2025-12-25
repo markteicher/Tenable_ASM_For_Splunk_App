@@ -1,0 +1,178 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – User Activity</label>
+  <description>
+    User and system activity captured from Tenable Attack Surface Management.
+    Supports actor and email filtering with longitudinal activity analysis.
+  </description>
+
+  <!-- ========================= -->
+  <!-- Filters -->
+  <!-- ========================= -->
+  <fieldset submitButton="false">
+
+    <!-- Actor Filter -->
+    <input type="multiselect" token="actor_tok">
+      <label>Filter by Actor</label>
+      <choice value="*">All</choice>
+      <prefix>actor="</prefix>
+      <suffix>"</suffix>
+      <delimiter> OR </delimiter>
+      <search>
+        <query>
+          index=$ASM_INDEX$ sourcetype=asm:user_activity
+          | stats count by actor
+          | sort actor
+        </query>
+      </search>
+      <fieldForLabel>actor</fieldForLabel>
+      <fieldForValue>actor</fieldForValue>
+    </input>
+
+    <!-- Email Filter -->
+    <input type="multiselect" token="email_tok">
+      <label>Filter by Email</label>
+      <choice value="*">All</choice>
+      <prefix>email="</prefix>
+      <suffix>"</suffix>
+      <delimiter> OR </delimiter>
+      <search>
+        <query>
+          index=$ASM_INDEX$ sourcetype=asm:user_activity
+          | stats count by email
+          | sort email
+        </query>
+      </search>
+      <fieldForLabel>email</fieldForLabel>
+      <fieldForValue>email</fieldForValue>
+    </input>
+
+  </fieldset>
+
+  <!-- ========================= -->
+  <!-- Total Activity Count -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Total Activity Events</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Week over Week -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Week over Week Activity by Action</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | eval _time=strptime(created_at,"%Y-%m-%dT%H:%M:%S.%3NZ")
+            | timechart span=1w count by action
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Month over Month -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Month over Month Activity by Action</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | eval _time=strptime(created_at,"%Y-%m-%dT%H:%M:%S.%3NZ")
+            | timechart span=1mon count by action
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Quarter over Quarter -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Quarter over Quarter Activity by Action</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | eval _time=strptime(created_at,"%Y-%m-%dT%H:%M:%S.%3NZ")
+            | timechart span=3mon count by action
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Year over Year -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Year over Year Activity by Action</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | eval _time=strptime(created_at,"%Y-%m-%dT%H:%M:%S.%3NZ")
+            | timechart span=1y count by action
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Activity Detail Table -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>User Activity Details</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:user_activity
+            | search $actor_tok$ $email_tok$
+            | eval _time=strptime(created_at,"%Y-%m-%dT%H:%M:%S.%3NZ")
+            | table _time actor email action target description
+            | sort - _time
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
