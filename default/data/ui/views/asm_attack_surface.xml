@@ -1,0 +1,137 @@
+<dashboard version="1.1">
+  <label>Tenable Attack Surface Management – Attack Surface Metrics</label>
+  <description>
+    Breakdown of the discovered attack surface by asset type, severity, geography, and exposure characteristics.
+  </description>
+
+  <!-- ========================= -->
+  <!-- Asset Composition -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Record Type</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count by bd.record_type
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Assets by Severity</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count by bd.severity_ranking
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Exposure Characteristics -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Exposed Assets by Open Port</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | mvexpand ports.ports
+            | stats count by ports.ports
+            | sort - count
+            | head 10
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Assets with SSL Errors</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | where isnotnull(ssl.sslerror)
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Geographic Distribution -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Assets by Country</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count by ipgeo.country
+            | sort - count
+            | head 10
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Cloud-Hosted Assets</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | where ipgeo.cloudhosted=true
+            | stats count by ipgeo.cloud
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- High-Risk Surface -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Critical & High Severity Assets</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | where bd.severity_ranking IN ("critical","high")
+            | table bd.hostname bd.ip_address bd.record_type bd.severity_ranking ipgeo.country ports.ports ssl.sslerror
+            | sort bd.severity_ranking
+          </query>
+        </search>
+        <option name="count">15</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
