@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 bin/tenable_asm_admin_users.py
 
@@ -7,13 +8,13 @@ Tenable Attack Surface Management – Admin Users
 Endpoint: GET https://asm.cloud.tenable.com/api/1.0/admin/users
 
 COMBAT / RESILIENT BEHAVIOR
-- Strict stdout discipline: emits ONLY JSON events (one per line)
-- Proxy support (enabled toggle + URL)
+- Strict stdout discipline: JSON events only
+- Proxy support (scheme/host/port/auth)
 - Retries with exponential backoff + jitter
-- 429 handling with Retry-After support
-- Timeout discipline (connect + read)
-- Emits operational telemetry events: counts + latency + status
-- Emits normalized error event on failure
+- 429 handling with Retry-After
+- Connect + read timeout discipline
+- Full-fidelity record emission
+- Telemetry + normalized error events
 """
 
 import json
@@ -28,24 +29,27 @@ import requests
 
 
 APP_NAME = "Tenable_Attack_Surface_Management_for_Splunk"
-URL = "https://asm.cloud.tenable.com/api/1.0/admin/users"
+ASM_URL = "https://asm.cloud.tenable.com/api/1.0/admin/users"
 
-# Retry policy (combat defaults)
+# Retry policy
 MAX_ATTEMPTS = 6
-BASE_BACKOFF_SECONDS = 1.0
-MAX_BACKOFF_SECONDS = 30.0
+BASE_BACKOFF = 1.0
+MAX_BACKOFF = 30.0
 
-# Requests timeout policy (connect, read)
-DEFAULT_CONNECT_TIMEOUT = 10
-DEFAULT_READ_TIMEOUT = 60
+# Timeouts
+CONNECT_TIMEOUT = 10
+READ_TIMEOUT = 60
 
+
+# ------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------
 
 def emit(event: Dict[str, Any]) -> None:
-    """Emit a single event to stdout for Splunk ingestion."""
     print(json.dumps(event, ensure_ascii=False))
 
 
-def _utc_epoch() -> int:
+def utc_epoch() -> int:
     return int(time.time())
 
 
@@ -53,235 +57,175 @@ def app_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-def load_settings() -> Tuple[str, str, str, int, int, int]:
-    """
-    Loads settings from:
-      - local/asm_settings.conf (preferred)
-      - default/asm_settings.conf (fallback)
+# ------------------------------------------------------------
+# Settings
+# ------------------------------------------------------------
 
-    Expected stanza: [tenable_asm]
-      api_key
-      proxy_enabled (0/1)
-      proxy_url
-      timeout_seconds (optional, used as read timeout)
-      connect_timeout_seconds (optional)
-      max_attempts (optional)
-    """
+def load_settings() -> Tuple[str, Optional[Dict[str, str]]]:
     root = app_root()
     cp = ConfigParser()
 
-    if not cp.read([f"{root}/local/asm_settings.conf", f"{root}/default/asm_settings.conf"]):
-        raise RuntimeError("asm_settings.conf not found in local/ or default/")
+    if not cp.read([
+        f"{root}/local/asm_settings.conf",
+        f"{root}/default/asm_settings.conf",
+    ]):
+        raise RuntimeError("asm_settings.conf not found")
 
-    if "tenable_asm" not in cp:
-        raise RuntimeError("Missing [tenable_asm] stanza in asm_settings.conf")
+    if "global" not in cp:
+        raise RuntimeError("Missing [global] stanza in asm_settings.conf")
 
-    s = cp["tenable_asm"]
+    g = cp["global"]
 
-    api_key = (s.get("api_key") or "").strip()
+    api_key = (g.get("asm_api_key") or "").strip()
     if not api_key:
-        raise RuntimeError("Missing api_key in [tenable_asm]")
+        raise RuntimeError("Missing asm_api_key")
 
-    proxy_enabled = (s.get("proxy_enabled") or "0").strip()
-    proxy_url = (s.get("proxy_url") or "").strip()
+    proxy_enabled = (g.get("proxy_enabled") or "false").lower() == "true"
 
-    # Read timeout (historical field)
-    timeout_seconds = int((s.get("timeout_seconds") or str(DEFAULT_READ_TIMEOUT)).strip())
+    proxy = None
+    if proxy_enabled:
+        scheme = (g.get("proxy_scheme") or "").strip()
+        host = (g.get("proxy_host") or "").strip()
+        port = (g.get("proxy_port") or "").strip()
+        user = (g.get("proxy_username") or "").strip()
+        pwd = (g.get("proxy_password") or "").strip()
 
-    # Optional connect timeout
-    connect_timeout_seconds = int((s.get("connect_timeout_seconds") or str(DEFAULT_CONNECT_TIMEOUT)).strip())
+        if not (scheme and host and port):
+            raise RuntimeError("Proxy enabled but scheme/host/port not fully defined")
 
-    # Optional override attempts
-    max_attempts = int((s.get("max_attempts") or str(MAX_ATTEMPTS)).strip())
+        auth = f"{user}:{pwd}@" if user and pwd else ""
+        proxy_url = f"{scheme}://{auth}{host}:{port}"
+        proxy = {"http": proxy_url, "https": proxy_url}
 
-    return api_key, proxy_enabled, proxy_url, timeout_seconds, connect_timeout_seconds, max_attempts
+    return api_key, proxy
 
 
-def _sleep_backoff(attempt: int, retry_after: Optional[float] = None) -> None:
-    """
-    attempt is 1-based attempt number (1..N)
-    Implements exponential backoff with jitter, clamped.
-    If Retry-After supplied, we honor it (plus small jitter).
-    """
+# ------------------------------------------------------------
+# Backoff
+# ------------------------------------------------------------
+
+def sleep_backoff(attempt: int, retry_after: Optional[float] = None) -> None:
     if retry_after is not None:
-        delay = max(0.0, float(retry_after))
-        delay = min(delay, MAX_BACKOFF_SECONDS)
-        delay = delay + random.uniform(0.0, 0.5)
-        time.sleep(delay)
+        delay = min(float(retry_after), MAX_BACKOFF)
+        time.sleep(delay + random.uniform(0, 0.5))
         return
 
-    exp = min(MAX_BACKOFF_SECONDS, BASE_BACKOFF_SECONDS * (2 ** (attempt - 1)))
-    delay = exp + random.uniform(0.0, 0.75)
-    delay = min(delay, MAX_BACKOFF_SECONDS)
-    time.sleep(delay)
+    delay = min(BASE_BACKOFF * (2 ** (attempt - 1)), MAX_BACKOFF)
+    time.sleep(delay + random.uniform(0, 0.75))
 
 
-def _extract_retry_after(resp: requests.Response) -> Optional[float]:
+def retry_after(resp: requests.Response) -> Optional[float]:
     ra = resp.headers.get("Retry-After")
-    if not ra:
-        return None
     try:
-        return float(ra)
+        return float(ra) if ra else None
     except Exception:
         return None
 
 
-def fetch_admin_users(
-    api_key: str,
-    proxy_enabled: str,
-    proxy_url: str,
-    read_timeout: int,
-    connect_timeout: int,
-    max_attempts: int,
-) -> Dict[str, Any]:
-    """
-    Returns a dict with:
-      {
-        "http_status": int,
-        "latency_ms": int,
-        "attempts": int,
-        "users": list,
-        "raw_total": int,
-      }
-    Raises on terminal failure.
-    """
+# ------------------------------------------------------------
+# Fetch
+# ------------------------------------------------------------
 
+def fetch_users(api_key: str, proxies: Optional[Dict[str, str]]) -> Dict[str, Any]:
     headers = {
         "accept": "application/json",
-        # IMPORTANT: matches your working pattern (raw token string)
-        "Authorization": api_key,
+        "Authorization": api_key,  # raw token, as required
     }
 
     sess = requests.Session()
-
-    if proxy_enabled == "1" and proxy_url:
-        sess.proxies.update({"http": proxy_url, "https": proxy_url})
-
-    timeout = (connect_timeout, read_timeout)
+    if proxies:
+        sess.proxies.update(proxies)
 
     start = time.time()
-    last_exc: Optional[Exception] = None
-    last_status: Optional[int] = None
+    last_status = None
+    last_error = None
 
-    for attempt in range(1, max_attempts + 1):
+    for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            resp = sess.get(URL, headers=headers, timeout=timeout)
+            resp = sess.get(
+                ASM_URL,
+                headers=headers,
+                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            )
 
             last_status = resp.status_code
 
-            # Rate limit
             if resp.status_code == 429:
-                _sleep_backoff(attempt, _extract_retry_after(resp))
+                sleep_backoff(attempt, retry_after(resp))
                 continue
 
-            # Retryable server errors
             if resp.status_code in (500, 502, 503, 504):
-                _sleep_backoff(attempt)
+                sleep_backoff(attempt)
                 continue
 
-            # Auth / perms / bad request should not loop forever
             if resp.status_code in (400, 401, 403, 404):
-                body = ""
-                try:
-                    body = resp.text[:4000]
-                except Exception:
-                    body = ""
-                raise RuntimeError(f"HTTP {resp.status_code} from ASM admin/users. Body: {body}")
+                raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:2000]}")
 
             resp.raise_for_status()
 
             payload = resp.json()
-            users = payload.get("list", [])
-            total = payload.get("total", None)
+            users = payload.get("list")
 
-            latency_ms = int((time.time() - start) * 1000)
-
-            # Validate expected type
             if not isinstance(users, list):
-                raise RuntimeError("ASM admin/users payload missing 'list' array")
+                raise RuntimeError("Invalid payload: missing list[]")
 
             return {
                 "http_status": resp.status_code,
-                "latency_ms": latency_ms,
+                "latency_ms": int((time.time() - start) * 1000),
                 "attempts": attempt,
                 "users": users,
-                "raw_total": total if total is not None else len(users),
+                "total": payload.get("total", len(users)),
             }
 
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-            last_exc = e
-            _sleep_backoff(attempt)
-            continue
-        except requests.exceptions.RequestException as e:
-            # Some request errors can be transient; retry a few times
-            last_exc = e
-            _sleep_backoff(attempt)
-            continue
         except Exception as e:
-            # Terminal logic / parse / 4xx
-            last_exc = e
-            break
+            last_error = e
+            sleep_backoff(attempt)
 
-    latency_ms = int((time.time() - start) * 1000)
-    status_note = f" last_http_status={last_status}" if last_status is not None else ""
-    raise RuntimeError(f"Failed to fetch ASM admin users after {max_attempts} attempts.{status_note} error={last_exc} latency_ms={latency_ms}")
+    raise RuntimeError(
+        f"Failed after {MAX_ATTEMPTS} attempts "
+        f"(last_status={last_status}, error={last_error})"
+    )
 
+
+# ------------------------------------------------------------
+# Main
+# ------------------------------------------------------------
 
 def main() -> None:
-    run_ts = _utc_epoch()
-
-    # Heartbeat / start event
     emit({
         "event_type": "asm_admin_users_run_start",
-        "ts": run_ts,
-        "endpoint": URL,
-        "app": APP_NAME,
+        "ts": utc_epoch(),
+        "endpoint": ASM_URL,
     })
 
     try:
-        api_key, proxy_enabled, proxy_url, read_timeout, connect_timeout, max_attempts = load_settings()
+        api_key, proxies = load_settings()
+        result = fetch_users(api_key, proxies)
 
-        result = fetch_admin_users(
-            api_key=api_key,
-            proxy_enabled=proxy_enabled,
-            proxy_url=proxy_url,
-            read_timeout=read_timeout,
-            connect_timeout=connect_timeout,
-            max_attempts=max_attempts,
-        )
-
-        users = result["users"]
-        processed = 0
-
-        # Emit each user as an event (combat: full fidelity)
-        for u in users:
-            processed += 1
+        for user in result["users"]:
             emit({
                 "event_type": "asm_admin_user",
-                "ts": _utc_epoch(),
-                "source_endpoint": URL,
-                "record": u,  # keep all fields, no assumptions
+                "ts": utc_epoch(),
+                "record": user,
             })
 
-        # Summary telemetry event
         emit({
             "event_type": "asm_admin_users_run_summary",
-            "ts": _utc_epoch(),
-            "endpoint": URL,
-            "http_status": result.get("http_status"),
-            "attempts": result.get("attempts"),
-            "latency_ms": result.get("latency_ms"),
-            "records_retrieved": len(users),
-            "records_processed": processed,
-            "raw_total": result.get("raw_total"),
-            "proxy_enabled": True if proxy_enabled == "1" else False,
+            "ts": utc_epoch(),
+            "endpoint": ASM_URL,
+            "http_status": result["http_status"],
+            "attempts": result["attempts"],
+            "latency_ms": result["latency_ms"],
+            "records_retrieved": len(result["users"]),
+            "raw_total": result["total"],
+            "proxy_used": bool(proxies),
         })
 
     except Exception as e:
         emit({
             "event_type": "asm_admin_users_error",
-            "ts": _utc_epoch(),
-            "endpoint": URL,
+            "ts": utc_epoch(),
+            "endpoint": ASM_URL,
             "error": str(e),
         })
         sys.exit(1)
