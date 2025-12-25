@@ -1,1 +1,145 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Errors & Failures</label>
+  <description>
+    Visibility into errors, failures, and ingestion problems related to Tenable Attack Surface Management data.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Error KPIs -->
+  <!-- ========================= -->
+  <row>
+
+    <panel>
+      <title>Total Errors (All Time)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | stats count as total_errors
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Errors (Last 24 Hours)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-24h
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | stats count as errors_24h
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Distinct Error Types</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | stats dc(error) as error_types
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+  </row>
+
+  <!-- ========================= -->
+  <!-- Error Trend -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Error Trend (Last 7 Days)</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-7d
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | timechart span=1h count
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Errors</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Errors by Sourcetype -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Errors by Sourcetype</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | stats count by sourcetype
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Sourcetype</option>
+        <option name="charting.axisTitleY.text">Count</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Top Errors -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Top Errors</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | stats count by error
+            | sort - count
+            | head 20
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Recent Error Events -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Recent Error Events</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | table _time sourcetype event_type error message
+            | sort - _time
+            | head 50
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
