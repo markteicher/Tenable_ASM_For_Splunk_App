@@ -1,54 +1,21 @@
 <dashboard version="1.1">
   <label>Tenable ASM – Suggestions</label>
   <description>
-    Suggestions and rule breakdown from indexed ASM suggestion events.
+    Visibility into Tenable Attack Surface Management suggestions, types, and rule complexity.
   </description>
 
-  <fieldset submitButton="false">
-
-    <input type="dropdown" token="tok_archived">
-      <label>Archived</label>
-      <choice value="*">All</choice>
-      <choice value="false">Active</choice>
-      <choice value="true">Archived</choice>
-      <default>*</default>
-    </input>
-
-    <input type="dropdown" token="tok_type">
-      <label>Suggestion Type</label>
-      <choice value="*">All</choice>
-      <default>*</default>
-      <prefix>suggestion_type="</prefix>
-      <suffix>"</suffix>
-      <search>
-        <query>
-          index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-          | stats count by suggestion_type
-          | sort suggestion_type
-        </query>
-      </search>
-      <fieldForLabel>suggestion_type</fieldForLabel>
-      <fieldForValue>suggestion_type</fieldForValue>
-    </input>
-
-    <input type="text" token="tok_text">
-      <label>Search Suggestion Text</label>
-      <default>*</default>
-    </input>
-
-  </fieldset>
-
   <!-- ========================= -->
-  <!-- Summary -->
+  <!-- Suggestion Counts -->
   <!-- ========================= -->
   <row>
+
     <panel>
       <title>Total Suggestions</title>
       <single>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | stats dc(id)
+            | stats dc(id) as total
           </query>
         </search>
         <option name="drilldown">none</option>
@@ -62,7 +29,7 @@
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
             | where isnull(deleted_at) OR deleted_at=""
-            | stats dc(id)
+            | stats dc(id) as active
           </query>
         </search>
         <option name="drilldown">none</option>
@@ -76,74 +43,58 @@
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
             | where isnotnull(deleted_at) AND deleted_at!=""
-            | stats dc(id)
+            | stats dc(id) as archived
           </query>
         </search>
         <option name="drilldown">none</option>
       </single>
     </panel>
+
   </row>
 
   <!-- ========================= -->
-  <!-- Suggestions Table -->
+  <!-- Suggestion Type Distribution -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Suggestions</title>
-      <table>
+      <title>Suggestions by Type</title>
+      <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval is_archived=if(isnotnull(deleted_at) AND deleted_at!="","true","false")
-            | where ("$tok_archived$"="*" OR is_archived="$tok_archived$")
-            | search $tok_type$
-            | eval suggestion_text=coalesce(suggestion_text, suggestion_title)
-            | eval _match=if("$tok_text$"="*" OR "$tok_text$"="", 1, like(lower(suggestion_text), "%".lower("$tok_text$")."%"))
-            | where _match=1
-            | stats
-                latest(suggestion_text) as suggestion_text
-                latest(suggestion_type) as suggestion_type
-                latest(created_at) as created_at
-                latest(deleted_at) as deleted_at
-                latest(is_archived) as is_archived
-              by id
-            | table id suggestion_text suggestion_type is_archived created_at deleted_at
+            | stats count by suggestion_type
+            | sort - count
           </query>
         </search>
-        <option name="count">20</option>
-        <option name="wrap">true</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Suggestion Type</option>
+        <option name="charting.axisTitleY.text">Count</option>
         <option name="drilldown">none</option>
-        <option name="export.menu">true</option>
-      </table>
+      </chart>
     </panel>
   </row>
 
   <!-- ========================= -->
-  <!-- Rule Breakdown -->
+  <!-- Rules per Suggestion -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Suggestion Rules</title>
-      <table>
+      <title>Rules per Suggestion</title>
+      <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval is_archived=if(isnotnull(deleted_at) AND deleted_at!="","true","false")
-            | where ("$tok_archived$"="*" OR is_archived="$tok_archived$")
-            | search $tok_type$
-            | eval suggestion_text=coalesce(suggestion_text, suggestion_title)
-            | spath input=suggestion_details.rules
-            | mvexpand suggestion_details.rules
-            | spath input=suggestion_details.rules path=rule output=rule
-            | spath input=suggestion_details.rules path=description output=description
-            | table id suggestion_text suggestion_type rule description
+            | eval rule_count = mvcount('suggestion_details.rules{}.rule')
+            | stats avg(rule_count) as avg_rules
+                    max(rule_count) as max_rules
+                    min(rule_count) as min_rules
           </query>
         </search>
-        <option name="count">20</option>
-        <option name="wrap">true</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.text">Metric</option>
+        <option name="charting.axisTitleY.text">Rule Count</option>
         <option name="drilldown">none</option>
-        <option name="export.menu">true</option>
-      </table>
+      </chart>
     </panel>
   </row>
 
