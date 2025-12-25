@@ -1,0 +1,98 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Subscriptions</label>
+  <description>
+    Visibility into Tenable Attack Surface Management subscriptions and coverage status.
+  </description>
+
+  <!-- ========================= -->
+  <!-- Subscription Counts -->
+  <!-- ========================= -->
+  <row>
+
+    <panel>
+      <title>Total Subscriptions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscription
+            | stats dc(id) as total
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Active Subscriptions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscription
+            | where status="active"
+            | stats dc(id) as active
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Inactive / Expired</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscription
+            | where status!="active"
+            | stats dc(id) as inactive
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+  </row>
+
+  <!-- ========================= -->
+  <!-- Subscriptions by Type -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Subscriptions by Type</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscription
+            | eval subscription_type=coalesce(subscription_type,"unknown")
+            | stats count by subscription_type
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Subscription Details -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Subscription Details</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:subscription
+            | table id name subscription_type status start_date end_date asset_limit
+            | sort - start_date
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+        <option name="export.menu">true</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
