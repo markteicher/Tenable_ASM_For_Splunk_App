@@ -97,5 +97,28 @@
       </chart>
     </panel>
   </row>
+    <!-- ========================= -->
+  <!-- Suggestion Details -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Suggestion Details</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
+            | eval status=if(isnull(deleted_at) OR deleted_at="","active","archived")
+            | eval rule_count = mvcount('suggestion_details.rules{}.rule')
+            | table id suggestion_type suggestion_text status created_at deleted_at rule_count
+            | sort - created_at
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+        <option name="export.menu">true</option>
+      </table>
+    </panel>
+  </row>
 
 </dashboard>
