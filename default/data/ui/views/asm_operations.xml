@@ -1,1 +1,152 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Operations</label>
+  <description>
+    Operational visibility into Tenable Attack Surface Management data ingestion, processing volume, freshness, and errors.
+  </description>
 
+  <!-- ========================= -->
+  <!-- Operational KPIs -->
+  <!-- ========================= -->
+  <row>
+
+    <panel>
+      <title>Total Records Ingested</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats count as total_records
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Records (Last 24 Hours)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-24h
+            | stats count as records_24h
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Records (Last 7 Days)</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-7d@d
+            | stats count as records_7d
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Active Sourcetypes</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats dc(sourcetype) as sourcetypes
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Volume Over Time -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Ingest Volume Over Time</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | timechart span=1h count
+          </query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Records</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Volume by Sourcetype -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Records by Sourcetype</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats count by sourcetype
+            | sort - count
+          </query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.axisTitleX.text">Sourcetype</option>
+        <option name="charting.axisTitleY.text">Records</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Data Freshness -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Latest Event by Sourcetype</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats latest(_time) as last_seen by sourcetype
+            | eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+            | sort sourcetype
+          </query>
+        </search>
+        <option name="wrap">false</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Error Visibility -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Errors & Failures</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%")
+            | table _time sourcetype event_type error
+            | sort - _time
+            | head 50
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
