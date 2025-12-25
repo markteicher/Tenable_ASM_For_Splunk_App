@@ -1,11 +1,11 @@
 <dashboard version="1.1">
   <label>Tenable ASM – Users</label>
   <description>
-    User inventory for Tenable Attack Surface Management.
+    User accounts with access to Tenable Attack Surface Management.
   </description>
 
   <!-- ========================= -->
-  <!-- Total Users -->
+  <!-- KPI -->
   <!-- ========================= -->
   <row>
     <panel>
@@ -13,8 +13,8 @@
       <single>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:users
-            | stats dc(id) as total_users
+            index=$ASM_INDEX$ sourcetype=asm:users
+            | stats count
           </query>
         </search>
         <option name="drilldown">none</option>
@@ -23,30 +23,42 @@
   </row>
 
   <!-- ========================= -->
-  <!-- Users Detailed Listing -->
+  <!-- User Details -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Users</title>
+      <title>User Details</title>
       <table>
         <search>
           <query>
-            index=$ASM_INDEX$ sourcetype=tenable:asm:users
+            index=$ASM_INDEX$ sourcetype=asm:users
             | table
                 id
+                name
                 email
-                access_level
-                workspace
-                business_id
+                role
+                status
                 created_at
-                first_login
-                user_inventories_limit
-            | sort email
+                updated_at
+            | sort name
           </query>
         </search>
+
         <option name="count">25</option>
         <option name="wrap">true</option>
-        <option name="drilldown">none</option>
+        <option name="drilldown">row</option>
+
+        <!-- Drilldown from Activity -->
+        <drilldown>
+          <link>
+            <![CDATA[
+            /app/$app$/asm_user_activity
+            ?actor=$row.name$
+            &email=$row.email$
+            ]]>
+          </link>
+        </drilldown>
+
       </table>
     </panel>
   </row>
