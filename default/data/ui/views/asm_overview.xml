@@ -1,0 +1,71 @@
+<dashboard version="1.1">
+  <label>Tenable Attack Surface Management – Overview</label>
+  <description>
+    High-level operational and inventory overview of Tenable Attack Surface Management data ingested into Splunk.
+  </description>
+
+  <!-- ========================= -->
+  <!-- Key Metrics -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Total Assets</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:asset
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Total Inventories</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:inventory
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Active Suggestions</title>
+      <single>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestion
+            | where isnull(deleted_at)
+            | stats count
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Volume -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Records Ingested (All Time)</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | timechart span=1h count
+          </query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+</dashboard>
