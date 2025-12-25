@@ -1,1 +1,169 @@
+<dashboard version="1.1">
+  <label>Tenable ASM – Diagnostics</label>
+  <description>
+    Diagnostics for Tenable Attack Surface Management for Splunk: configuration visibility, REST handler tests, and recent ingestion/error samples.
+  </description>
 
+  <!-- ========================= -->
+  <!-- REST Handler Tests -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>REST: Proxy Test</title>
+      <html>
+        <p>
+          Runs the proxy connectivity test endpoint wired via <code>restmap.conf</code>.
+        </p>
+        <p>
+          <a href="/en-US/splunkd/__raw/servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/asm/proxy_test"
+             target="_blank">Run Proxy Test</a>
+        </p>
+      </html>
+    </panel>
+
+    <panel>
+      <title>REST: Auth Test</title>
+      <html>
+        <p>
+          Runs the Tenable ASM authentication test endpoint wired via <code>restmap.conf</code>.
+        </p>
+        <p>
+          <a href="/en-US/splunkd/__raw/servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/asm/auth_test"
+             target="_blank">Run Auth Test</a>
+        </p>
+      </html>
+    </panel>
+
+    <panel>
+      <title>REST: Save Settings</title>
+      <html>
+        <p>
+          Saves current settings using the REST endpoint handler (used by setup).
+        </p>
+        <p>
+          <a href="/en-US/splunkd/__raw/servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/asm/save"
+             target="_blank">Run Save (POST required)</a>
+        </p>
+      </html>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Current Settings Snapshot -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>ASM Settings (Current)</title>
+      <table>
+        <search>
+          <query>
+            | rest /servicesNS/nobody/Tenable_Attack_Surface_Management_for_Splunk/configs/conf-asm_settings/settings
+            | eval api_key=if(len(api_key)&gt;0,"(set)","(missing)")
+            | eval proxy=if(len(proxy)&gt;0,proxy,"(none)")
+            | eval index=if(len(asm_index)&gt;0,asm_index,"(missing)")
+            | fields api_key proxy index timeout_seconds verify_tls enable_assets enable_inventories enable_suggestions enable_suggestion_counts enable_txt_records enable_users enable_user_actions enable_limits enable_subscriptions
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Ingest Sanity Checks -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Latest Events by Sourcetype</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$
+            | stats latest(_time) as last_seen count as events by sourcetype
+            | eval last_seen=strftime(last_seen, "%Y-%m-%d %H:%M:%S")
+            | sort - events
+          </query>
+        </search>
+        <option name="count">25</option>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+
+    <panel>
+      <title>Events by Sourcetype (Last 24h)</title>
+      <chart>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-24h
+            | timechart span=1h count by sourcetype limit=10
+          </query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Error Sanity Check -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Recent Errors (Any Sourcetype/Handler)</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ earliest=-7d
+            | where like(sourcetype, "%error%") OR like(event_type, "%error%") OR isnotnull(error)
+            | table _time sourcetype event_type error message
+            | sort - _time
+            | head 50
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
+  <!-- Payload Spot Checks -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Sample Payloads: Assets</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=asm:assets
+            | table _time id "bd.domain" "bd.hostname" "bd.ip_address" "bd.severity_ranking" "bd.last_metadata_change"
+            | sort - _time
+            | head 25
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+
+    <panel>
+      <title>Sample Payloads: Suggestions</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
+            | eval status=if(isnull(deleted_at) OR deleted_at="","active","archived")
+            | table _time id suggestion_type suggestion_text status created_at deleted_at
+            | sort - _time
+            | head 25
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
