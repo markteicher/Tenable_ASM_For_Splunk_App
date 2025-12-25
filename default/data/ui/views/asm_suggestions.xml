@@ -28,7 +28,8 @@
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | where isnull(deleted_at) OR deleted_at=""
+            | eval deleted_at=coalesce(deleted_at,"")
+            | where deleted_at=""
             | stats dc(id) as active
           </query>
         </search>
@@ -42,7 +43,8 @@
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | where isnotnull(deleted_at) AND deleted_at!=""
+            | eval deleted_at=coalesce(deleted_at,"")
+            | where deleted_at!=""
             | stats dc(id) as archived
           </query>
         </search>
@@ -62,7 +64,8 @@
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | stats count by suggestion_type
+            | eval suggestion_type=coalesce(suggestion_type,"unknown")
+            | stats count as count by suggestion_type
             | sort - count
           </query>
         </search>
@@ -75,29 +78,53 @@
   </row>
 
   <!-- ========================= -->
-  <!-- Rules per Suggestion -->
+  <!-- Rules per Suggestion Distribution -->
   <!-- ========================= -->
   <row>
     <panel>
-      <title>Rules per Suggestion</title>
+      <title>Rules per Suggestion (Distribution)</title>
       <chart>
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval rule_count = mvcount('suggestion_details.rules{}.rule')
-            | stats avg(rule_count) as avg_rules
-                    max(rule_count) as max_rules
-                    min(rule_count) as min_rules
+            | spath path=suggestion_details.rules{} output=rules_mv
+            | eval rule_count=mvcount(rules_mv)
+            | stats count as suggestions by rule_count
+            | sort 0 + rule_count
           </query>
         </search>
         <option name="charting.chart">column</option>
-        <option name="charting.axisTitleX.text">Metric</option>
-        <option name="charting.axisTitleY.text">Rule Count</option>
+        <option name="charting.axisTitleX.text">Rule Count</option>
+        <option name="charting.axisTitleY.text">Suggestions</option>
         <option name="drilldown">none</option>
       </chart>
     </panel>
   </row>
-    <!-- ========================= -->
+
+  <!-- ========================= -->
+  <!-- Rules Summary Stats -->
+  <!-- ========================= -->
+  <row>
+    <panel>
+      <title>Rule Count Summary (Avg / Min / Max)</title>
+      <table>
+        <search>
+          <query>
+            index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
+            | spath path=suggestion_details.rules{} output=rules_mv
+            | eval rule_count=mvcount(rules_mv)
+            | stats avg(rule_count) as avg_rules min(rule_count) as min_rules max(rule_count) as max_rules
+          </query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="drilldown">none</option>
+        <option name="count">1</option>
+        <option name="export.menu">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ========================= -->
   <!-- Suggestion Details -->
   <!-- ========================= -->
   <row>
@@ -107,9 +134,12 @@
         <search>
           <query>
             index=$ASM_INDEX$ sourcetype=tenable:asm:suggestions
-            | eval status=if(isnull(deleted_at) OR deleted_at="","active","archived")
-            | eval rule_count = mvcount('suggestion_details.rules{}.rule')
-            | table id suggestion_type suggestion_text status created_at deleted_at rule_count
+            | eval deleted_at=coalesce(deleted_at,"")
+            | eval status=if(deleted_at="","active","archived")
+            | spath path=suggestion_details.rules{} output=rules_mv
+            | eval rule_count=mvcount(rules_mv)
+            | eval rules_preview=mvjoin(rules_mv," | ")
+            | table id suggestion_type suggestion_text status created_at deleted_at rule_count rules_preview
             | sort - created_at
           </query>
         </search>
